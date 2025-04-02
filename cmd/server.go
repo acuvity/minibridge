@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/mcp"
 	"go.acuvity.ai/tg/tglib"
 )
@@ -21,6 +22,8 @@ func init() {
 	Server.Flags().String("client-ca", "", "Path to a client CA to validate incoming connections")
 	Server.Flags().String("mcp-cmd", "", "Command to launch the MCP server")
 	Server.Flags().StringSlice("mcp-arg", nil, "List of argument to pass to the MCP server")
+	Server.Flags().Bool("health-enable", false, "If set, start a health server for production deployments")
+	Server.Flags().String("health-listen", ":8080", "Listen address of the health server")
 }
 
 // Server is the cobra command to run the server.
@@ -46,6 +49,8 @@ var Server = &cobra.Command{
 		keyPath := viper.GetString("key")
 		keyPass := viper.GetString("key-pass")
 		clientCAPath := viper.GetString("client-ca")
+		healthEnabled := viper.GetBool("health-enable")
+		healthListen := viper.GetString("health-listen")
 
 		tlsConfig := &tls.Config{}
 		var hasTLS bool
@@ -90,8 +95,16 @@ var Server = &cobra.Command{
 		slog.Info("WS Server configured", "tls", hasTLS, "listen", listen)
 		slog.Info("MCP Server configured", "command", mcpServer.Command, "args", mcpServer.Args)
 
+		metricsManager := bahamut.NewPrometheusMetricsManager()
+
 		proxy := mcp.NewWSProxy(listen, tlsConfig, mcpServer)
 		proxy.Start(cmd.Context())
+
+		opts := []bahamut.Option{}
+		if healthEnabled && healthListen != "" {
+			opts = append(opts, bahamut.OptHealthServer(healthListen, nil), bahamut.OptHealthServerMetricsManager(metricsManager))
+			go bahamut.New(opts...).Run(cmd.Context())
+		}
 
 		<-cmd.Context().Done()
 
