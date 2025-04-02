@@ -12,6 +12,8 @@ defaults:
 env:
   GOPRIVATE: "github.com/acuvity,go.acuvity.ai"
   GOPROXY: "https://proxy.golang.org,direct"
+  GOTOKEN: ${{ secrets.GO_PRIVATE_REPO_PAT }}
+
 
 jobs:
   build:
@@ -35,6 +37,7 @@ jobs:
 
       - name: build
         run: |
+          git config --global url."https://acuvity:${GOTOKEN}@github.com/acuvity".insteadOf "https://github.com/acuvity"
           make
 
       - uses: acuvity/cov@1.0.2
