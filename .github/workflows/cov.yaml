@@ -1,0 +1,27 @@
+name: cov
+
+on:
+  workflow_run:
+    workflows: ["build-go"]
+    types:
+      - completed
+
+env:
+  GO111MODULE: on
+  GOPRIVATE: github.com/acuvity,go.acuvity.ai
+  GOPROXY: https://proxy.golang.org,direct
+  GOTOKEN: ${{ secrets.GO_PRIVATE_REPO_PAT }}
+
+jobs:
+  cov:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: setup
+        run: |
+          git config --global url."https://acuvity:${GOTOKEN}@github.com/acuvity".insteadOf "https://github.com/acuvity"
+      - uses: acuvity/cov@1.0.2
+        with:
+          cov_mode: send-status
+          workflow_run_id: ${{github.event.workflow_run.id}}
+          workflow_head_sha: ${{github.event.workflow_run.head_sha}}

@@ -1,0 +1,45 @@
+name: build-go
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  GOPRIVATE: "github.com/acuvity,go.acuvity.ai"
+  GOPROXY: "https://proxy.golang.org,direct"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go:
+          - "1.24"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+
+      - name: setup
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: build
+        run: |
+          make
+
+      - uses: acuvity/cov@1.0.2
+        with:
+          main_branch: main
+          cov_file: unit_coverage.out
+          cov_threshold: "0"
+          cov_mode: coverage

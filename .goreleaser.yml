@@ -1,0 +1,30 @@
+snapshot:
+  name_template: "v{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+    - '^examples:'
+builds:
+  - id: minibridge
+    binary: minibridge
+    goos:
+    - linux
+    - freebsd
+    - darwin
+    goarch:
+    - amd64
+    env:
+    - CGO_ENABLED=0
+
+archives:
+  - id: minibridge
+    format: binary
+    builds:
+    - minibridge
+
+signs:
+  - artifacts: checksum
+    args: ["-u", "0C3214A61024881F5CA1F5F056EDB08A11DCE325", "--output", "${signature}", "--detach-sign", "${artifact}"]
