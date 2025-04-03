@@ -15,31 +15,37 @@ import (
 	"go.acuvity.ai/wsc"
 )
 
-type sseFrontEnd struct {
+type sseFrontend struct {
 	backendURL string
 	server     *http.Server
 	sessions   map[string]wsc.Websocket
 	tlsConfig  *tls.Config
+	cfg        sseCfg
 
 	sync.RWMutex
 }
 
 // NewSSE returns a new frontend.Frontend that will listen to the given addr
-// and will connect to the given minibridge backend using the given *tls.tlsConfig.
+// and will connect to the given minibridge backend using the given options.
 // For every new connection to the /sse endpoint, a new websocket connection will
 // be initiated to the backend, thus keeping track of the session.
-func NewSSE(addr string, backend string, tlsConfig *tls.Config) Frontend {
+func NewSSE(addr string, backend string, tlsConfig *tls.Config, opts ...SSEOption) Frontend {
 
-	p := &sseFrontEnd{
+	cfg := newSSECfg()
+	for _, o := range opts {
+		o(&cfg)
+	}
+
+	p := &sseFrontend{
 		backendURL: backend,
 		tlsConfig:  tlsConfig,
 		sessions:   map[string]wsc.Websocket{},
+		cfg:        cfg,
 	}
 
 	p.server = &http.Server{
-		TLSConfig: tlsConfig.Clone(),
-		Addr:      addr,
-		Handler:   p,
+		Addr:    addr,
+		Handler: p,
 	}
 
 	return p
@@ -47,7 +53,7 @@ func NewSSE(addr string, backend string, tlsConfig *tls.Config) Frontend {
 
 // Start starts the frontend. It will block until the given context cancels or
 // until the server returns an error.
-func (p *sseFrontEnd) Start(ctx context.Context) error {
+func (p *sseFrontend) Start(ctx context.Context) error {
 
 	errCh := make(chan error)
 
@@ -72,7 +78,7 @@ func (p *sseFrontEnd) Start(ctx context.Context) error {
 	return p.server.Shutdown(stopCtx)
 }
 
-func (p *sseFrontEnd) connect(ctx context.Context) (wsc.Websocket, error) {
+func (p *sseFrontend) connect(ctx context.Context) (wsc.Websocket, error) {
 
 	session, resp, err := wsc.Connect(
 		ctx,
@@ -97,19 +103,19 @@ func (p *sseFrontEnd) connect(ctx context.Context) (wsc.Websocket, error) {
 	return session, nil
 }
 
-func (p *sseFrontEnd) registerSession(sid string, ws wsc.Websocket) {
+func (p *sseFrontend) registerSession(sid string, ws wsc.Websocket) {
 	p.Lock()
 	p.sessions[sid] = ws
 	p.Unlock()
 }
 
-func (p *sseFrontEnd) unregisterSession(sid string) {
+func (p *sseFrontend) unregisterSession(sid string) {
 	p.Lock()
 	delete(p.sessions, sid)
 	p.Unlock()
 }
 
-func (p *sseFrontEnd) getSession(sid string) wsc.Websocket {
+func (p *sseFrontend) getSession(sid string) wsc.Websocket {
 
 	p.RLock()
 	ws := p.sessions[sid]
@@ -120,11 +126,11 @@ func (p *sseFrontEnd) getSession(sid string) wsc.Websocket {
 
 // ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
 // you can use this function directly into your own *http.Server.
-func (p *sseFrontEnd) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	switch req.URL.Path {
 
-	case "/messages":
+	case p.cfg.messagesEndpoint:
 
 		if req.Method != http.MethodPost {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -154,7 +160,7 @@ func (p *sseFrontEnd) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 
-	case "/sse":
+	case p.cfg.sseEndpoint:
 
 		if req.Method != http.MethodGet {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -206,6 +212,8 @@ func (p *sseFrontEnd) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					slog.Error("Unable to flush remote event", "id", sid, err)
 					continue
 				}
+			case <-ws.Done():
+				return
 			}
 		}
 	}

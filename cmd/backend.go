@@ -16,23 +16,23 @@ import (
 )
 
 func init() {
-	Server.Flags().String("listen", ":8000", "Listen address of the bridge for incoming connections")
-	Server.Flags().String("cert", "", "Path to a certificate for WSS")
-	Server.Flags().String("key", "", "Path to the key for the certificate")
-	Server.Flags().String("key-pass", "", "Passphrase for the key")
-	Server.Flags().String("client-ca", "", "Path to a client CA to validate incoming connections")
-	Server.Flags().String("mcp-cmd", "", "Command to launch the MCP server")
-	Server.Flags().StringSlice("mcp-arg", nil, "List of argument to pass to the MCP server")
-	Server.Flags().Bool("health-enable", false, "If set, start a health server for production deployments")
-	Server.Flags().String("health-listen", ":8080", "Listen address of the health server")
-	Server.Flags().Bool("profiling-enable", false, "If set, enable profiling server")
-	Server.Flags().String("profiling-listen", ":6060", "Listen address of the health server")
+	Backend.Flags().String("listen", ":8000", "Listen address of the bridge for incoming connections")
+	Backend.Flags().String("cert", "", "Path to a certificate for WSS")
+	Backend.Flags().String("key", "", "Path to the key for the certificate")
+	Backend.Flags().String("key-pass", "", "Passphrase for the key")
+	Backend.Flags().String("client-ca", "", "Path to a client CA to validate incoming connections")
+	Backend.Flags().String("mcp-cmd", "", "Command to launch the MCP server")
+	Backend.Flags().StringSlice("mcp-arg", nil, "List of argument to pass to the MCP server")
+	Backend.Flags().Bool("health-enable", false, "If set, start a health server for production deployments")
+	Backend.Flags().String("health-listen", ":8080", "Listen address of the health server")
+	Backend.Flags().Bool("profiling-enable", false, "If set, enable profiling server")
+	Backend.Flags().String("profiling-listen", ":6060", "Listen address of the health server")
 }
 
-// Server is the cobra command to run the server.
-var Server = &cobra.Command{
-	Use:              "server",
-	Short:            "Start a secure bridge to an MCP server",
+// Backend is the cobra command to run the server.
+var Backend = &cobra.Command{
+	Use:              "backend",
+	Short:            "Start a minibridge backend for an MCP server",
 	SilenceUsage:     true,
 	SilenceErrors:    true,
 	TraverseChildren: true,

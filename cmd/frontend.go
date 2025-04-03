@@ -15,23 +15,25 @@ import (
 )
 
 func init() {
-	Client.Flags().String("listen", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
-	Client.Flags().String("server", "", "Address of the other end of the bridge")
-	Client.Flags().String("cert", "", "Path to a client certificate for WSS")
-	Client.Flags().String("key", "", "Path to the key for the client certificate")
-	Client.Flags().String("key-pass", "", "Passphrase for the key")
-	Client.Flags().String("ca", "", "Path to a CA to validate server connections")
-	Client.Flags().Bool("insecure-skip-verify", false, "If set, don't validate server's CA. Do not do this.")
-	Client.Flags().Bool("health-enable", false, "If set, start a health server for production deployments")
-	Client.Flags().String("health-listen", ":8080", "Listen address of the health server")
-	Client.Flags().Bool("profiling-enable", false, "If set, enable profiling server")
-	Client.Flags().String("profiling-listen", ":6060", "Listen address of the health server")
+	Frontend.Flags().String("listen", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
+	Frontend.Flags().String("backend", "", "Address of the minibridge backend")
+	Frontend.Flags().String("cert", "", "Path to a client certificate for WSS")
+	Frontend.Flags().String("key", "", "Path to the key for the client certificate")
+	Frontend.Flags().String("key-pass", "", "Passphrase for the key")
+	Frontend.Flags().String("ca", "", "Path to a CA to validate server connections")
+	Frontend.Flags().Bool("insecure-skip-verify", false, "If set, don't validate server's CA. Do not do this.")
+	Frontend.Flags().Bool("health-enable", false, "If set, start a health server for production deployments")
+	Frontend.Flags().String("health-listen", ":8080", "Listen address of the health server")
+	Frontend.Flags().Bool("profiling-enable", false, "If set, enable profiling server")
+	Frontend.Flags().String("profiling-listen", ":6060", "Listen address of the health server")
+	Frontend.Flags().String("endpoint-messages", "/messages", "When using HTTP, sets the endpoint to post messages")
+	Frontend.Flags().String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
 }
 
-// Client is the cobra command to run the client.
-var Client = &cobra.Command{
-	Use:              "client",
-	Short:            "Start a secure bridge to an MCP server",
+// Frontend is the cobra command to run the client.
+var Frontend = &cobra.Command{
+	Use:              "frontend",
+	Short:            "Start a secure frontend bridge to minibridge backend",
 	SilenceUsage:     true,
 	SilenceErrors:    true,
 	TraverseChildren: true,
@@ -46,7 +48,7 @@ var Client = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		listen := viper.GetString("listen")
-		serverURL := viper.GetString("server")
+		backendURL := viper.GetString("backend")
 		certPath := viper.GetString("cert")
 		keyPath := viper.GetString("key")
 		keyPass := viper.GetString("key-pass")
@@ -56,6 +58,8 @@ var Client = &cobra.Command{
 		healthListen := viper.GetString("health-listen")
 		profilingEnabled := viper.GetBool("profiling-enable")
 		profilingListen := viper.GetString("profiling-listen")
+		sseEndpoint := viper.GetString("endpoint-sse")
+		messageEndpoint := viper.GetString("endpoint-messages")
 
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: skipVerify,
@@ -111,12 +115,15 @@ var Client = &cobra.Command{
 
 		var proxy frontend.Frontend
 
-		if listen == "" {
-			slog.Info("Starting Stdio Proxy", "server", serverURL)
-			proxy = frontend.NewStdio(serverURL, tlsConfig)
+		if listen != "" {
+			slog.Info("Starting SSE Frontend", "backend", backendURL, "listen", listen, "sse", sseEndpoint, "messages", messageEndpoint)
+			proxy = frontend.NewSSE(listen, backendURL, tlsConfig,
+				frontend.SSEOptionSSEEndpoint(sseEndpoint),
+				frontend.SSEOptionMessageEndpoint(messageEndpoint),
+			)
 		} else {
-			slog.Info("Starting SSE Proxy", "server", serverURL, "listen", listen)
-			proxy = frontend.NewSSE(listen, serverURL, tlsConfig)
+			slog.Info("Starting Stdio Frontend", "backend", backendURL)
+			proxy = frontend.NewStdio(backendURL, tlsConfig)
 		}
 
 		return proxy.Start(cmd.Context())

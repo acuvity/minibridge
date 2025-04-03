@@ -20,8 +20,8 @@ func main() {
 	cobra.OnInitialize(initCobra)
 
 	cmd.Root.AddCommand(
-		cmd.Server,
-		cmd.Client,
+		cmd.Backend,
+		cmd.Frontend,
 	)
 
 	if err := cmd.Root.Execute(); err != nil {
