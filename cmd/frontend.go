@@ -26,7 +26,7 @@ func init() {
 	Frontend.Flags().String("health-listen", ":8080", "Listen address of the health server")
 	Frontend.Flags().Bool("profiling-enable", false, "If set, enable profiling server")
 	Frontend.Flags().String("profiling-listen", ":6060", "Listen address of the health server")
-	Frontend.Flags().String("endpoint-messages", "/messages", "When using HTTP, sets the endpoint to post messages")
+	Frontend.Flags().String("endpoint-messages", "/message", "When using HTTP, sets the endpoint to post messages")
 	Frontend.Flags().String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
 }
 
@@ -37,15 +37,7 @@ var Frontend = &cobra.Command{
 	SilenceUsage:     true,
 	SilenceErrors:    true,
 	TraverseChildren: true,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := viper.BindPFlags(cmd.PersistentFlags()); err != nil {
-			return err
-		}
-		if err := viper.BindPFlags(cmd.Flags()); err != nil {
-			return err
-		}
-		return nil
-	},
+
 	RunE: func(cmd *cobra.Command, args []string) error {
 		listen := viper.GetString("listen")
 		backendURL := viper.GetString("backend")

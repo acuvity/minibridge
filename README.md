@@ -2,13 +2,11 @@
 
 > NOTE: this is a work in progress
 
-Minibridge is a bridge between MCP servers and the rest of the world
+Minibridge is a bridge between MCP servers and the rest of the world. It
+operates as a backend <-> frontend connector between Agents and MCP Servers.
+It allows to expose MCP server securely over internet and allows seemless
+integration to the Acuvity
 
-It can be started in front of a remote MCP server to enable
-
-- sessionless with websockets
-- tls and mtls
-- todo
 
 
 ## Backend Example

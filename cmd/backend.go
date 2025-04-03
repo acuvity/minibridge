@@ -37,15 +37,7 @@ var Backend = &cobra.Command{
 	SilenceErrors:    true,
 	TraverseChildren: true,
 	Args:             cobra.MinimumNArgs(1),
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := viper.BindPFlags(cmd.PersistentFlags()); err != nil {
-			return err
-		}
-		if err := viper.BindPFlags(cmd.Flags()); err != nil {
-			return err
-		}
-		return nil
-	},
+
 	RunE: func(cmd *cobra.Command, args []string) error {
 		listen := viper.GetString("listen")
 		certPath := viper.GetString("cert")

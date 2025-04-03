@@ -18,6 +18,7 @@ import (
 type wsBackend struct {
 	server    *http.Server
 	mcpServer mcp.Server
+	clients   chan *mcp.StdioClient
 }
 
 // NewWebSocket retrurns a new backend.Backend exposing a Websocket to communicate
@@ -27,6 +28,7 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer mcp.Server) Ba
 
 	p := &wsBackend{
 		mcpServer: mcpServer,
+		clients:   make(chan *mcp.StdioClient),
 	}
 
 	p.server = &http.Server{
@@ -62,6 +64,24 @@ func (p *wsBackend) Start(ctx context.Context) error {
 		}
 	}()
 
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				client, err := mcp.NewStdioMCPClient(p.mcpServer)
+				if err != nil {
+					slog.Error("Unable to spawn MCP Server", err)
+					continue
+				}
+
+				p.clients <- client
+
+			}
+		}
+	}()
+
 	select {
 	case <-ctx.Done():
 	case err := <-errCh:
@@ -81,12 +101,6 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	client, err := mcp.NewStdioMCPClient(p.mcpServer)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("unable to launch mcp session: %s", err), http.StatusBadRequest)
-		return
-	}
-
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
@@ -103,32 +117,37 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	inCh, outCh, errCh := client.Start(req.Context())
+	defer session.Close(1001)
+
+	inCh, outCh, errCh := (<-p.clients).Start(req.Context())
 
 	for {
 
 		select {
+
 		case data := <-session.Read():
-			if len(data) == 0 {
-				continue
-			}
 
 			if !bytes.HasSuffix(data, []byte("\n")) {
 				data = append(data, '\n')
 			}
 
+			slog.Debug("Received data from websocket", "msg", string(data))
 			inCh <- data
 
 		case data := <-outCh:
+			slog.Debug("Received data from MCP Server", "msg", string(data))
 			session.Write(data)
 
 		case data := <-errCh:
-			slog.Debug("MCP Server log", "log", string(data))
+			_ = data
+			// slog.Debug("MCP Server log", "log", string(data))
 
 		case <-session.Done():
+			slog.Debug("Websocket has closed")
 			return
 
 		case <-req.Context().Done():
+			slog.Debug("Client is gone")
 			return
 		}
 	}

@@ -137,11 +137,16 @@ func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		sid := req.URL.Query().Get("id")
+		sid := req.URL.Query().Get("sessionId")
 		if sid == "" {
 			http.Error(w, "Query parameter ID is required", http.StatusBadRequest)
 			return
 		}
+
+		accepts := req.Header.Get("Accept")
+
+		log := slog.With("sid", sid)
+		log.Debug("Handling messages", "accept", accepts)
 
 		ws := p.getSession(sid)
 		if ws == nil {
@@ -156,9 +161,15 @@ func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		defer func() { _ = req.Body.Close() }()
 
-		ws.Write(data)
+		log.Debug("Message data", "msg", string(data))
 
-		w.WriteHeader(http.StatusOK)
+		w.Header().Add("Connection", "keep-alive")
+		w.Header().Add("Keep-Alive", "timeout=5")
+		w.Header().Add("Transfer-Encoding", "chunked")
+		w.WriteHeader(http.StatusAccepted)
+		w.Write([]byte("Accepted"))
+
+		ws.Write(data)
 
 	case p.cfg.sseEndpoint:
 
@@ -168,6 +179,9 @@ func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 
 		sid := uuid.Must(uuid.NewV6()).String()
+		log := slog.With("sid", sid)
+
+		log.Debug("Handling new SSE", "client", req.RemoteAddr)
 
 		ws, err := p.connect(req.Context())
 		if err != nil {
@@ -189,30 +203,40 @@ func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		rc := http.NewResponseController(w)
 
-		if _, err := fmt.Fprintf(w, "event: endpoint\ndata: /messages?id=%s\n\n", sid); err != nil {
-			slog.Error("Unable to send endpoint event", "id", sid, err)
+		if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, sid); err != nil {
+			log.Error("Unable to send endpoint event", err)
 			return
 		}
 
 		if err := rc.Flush(); err != nil {
-			slog.Error("Unable to flush endpoint event", "id", sid, err)
+			log.Error("Unable to flush endpoint event", err)
 			return
 		}
 
+		defer func() { _ = rc.Flush() }()
+
 		for {
 			select {
+
 			case <-req.Context().Done():
+				log.Debug("Client is gone")
 				return
+
 			case data := <-ws.Read():
-				if _, err := w.Write(data); err != nil {
-					slog.Error("Unable to write event", "id", sid, err)
+
+				log.Debug("Received data from backend", "data", string(data))
+
+				if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n", string(data)); err != nil {
+					log.Error("Unable to write event", err)
 					continue
 				}
 				if err := rc.Flush(); err != nil {
-					slog.Error("Unable to flush remote event", "id", sid, err)
+					log.Error("Unable to flush remote event", err)
 					continue
 				}
+
 			case <-ws.Done():
+				log.Debug("Backend websocket is gone")
 				return
 			}
 		}

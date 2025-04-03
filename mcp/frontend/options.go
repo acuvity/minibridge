@@ -8,7 +8,7 @@ type sseCfg struct {
 func newSSECfg() sseCfg {
 	return sseCfg{
 		sseEndpoint:      "/sse",
-		messagesEndpoint: "/messages",
+		messagesEndpoint: "/message",
 	}
 }
 

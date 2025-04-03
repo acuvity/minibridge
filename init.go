@@ -8,8 +8,11 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/spf13/viper"
-	"go.acuvity.ai/a3s/pkgs/bootstrap"
-	"go.acuvity.ai/a3s/pkgs/conf"
+)
+
+var (
+	cfgFile string
+	cfgName string
 )
 
 func initCobra() {
@@ -17,11 +20,6 @@ func initCobra() {
 	viper.SetEnvPrefix("minibridge")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
-
-	bootstrap.ConfigureLogger("minibridge", conf.LoggingConf{
-		LogLevel:  logLevel,
-		LogFormat: "console",
-	})
 
 	dataFolder, err := xdg.DataFile("minibridge")
 	if err != nil {
