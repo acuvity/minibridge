@@ -21,6 +21,7 @@ func main() {
 
 	cmd.Root.AddCommand(
 		cmd.Server,
+		cmd.Client,
 	)
 
 	if err := cmd.Root.Execute(); err != nil {

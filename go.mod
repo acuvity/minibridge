@@ -7,10 +7,12 @@ require go.acuvity.ai/wsc v0.0.0-20250219220143-0153e5776946
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/fatih/color v1.18.0
+	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/gorilla/websocket v1.5.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	go.acuvity.ai/a3s v0.0.0-20250331211316-39bc5ec90f85
+	go.acuvity.ai/bahamut v0.0.0-20250226152621-d4dd109ed78a
 	go.acuvity.ai/tg v0.0.0-20250220234315-d9494083aa3a
 )
 
@@ -39,7 +41,6 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/go-zoo/bone v1.3.0 // indirect
-	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/gravitational/trace v1.5.0 // indirect
@@ -98,7 +99,6 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.acuvity.ai/bahamut v0.0.0-20250226152621-d4dd109ed78a // indirect
 	go.acuvity.ai/elemental v0.0.0-20250226152430-c139902eba00 // indirect
 	go.acuvity.ai/manipulate v0.0.0-20250331211103-13b505fe3e16 // indirect
 	go.acuvity.ai/regolithe v0.0.0-20250321141528-1fe83b60f317 // indirect

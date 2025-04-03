@@ -10,33 +10,31 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.acuvity.ai/bahamut"
-	"go.acuvity.ai/minibridge/mcp"
-	"go.acuvity.ai/minibridge/mcp/backend"
+	"go.acuvity.ai/minibridge/mcp/frontend"
 	"go.acuvity.ai/tg/tglib"
 )
 
 func init() {
-	Server.Flags().String("listen", ":8000", "Listen address of the bridge for incoming connections")
-	Server.Flags().String("cert", "", "Path to a certificate for WSS")
-	Server.Flags().String("key", "", "Path to the key for the certificate")
-	Server.Flags().String("key-pass", "", "Passphrase for the key")
-	Server.Flags().String("client-ca", "", "Path to a client CA to validate incoming connections")
-	Server.Flags().String("mcp-cmd", "", "Command to launch the MCP server")
-	Server.Flags().StringSlice("mcp-arg", nil, "List of argument to pass to the MCP server")
-	Server.Flags().Bool("health-enable", false, "If set, start a health server for production deployments")
-	Server.Flags().String("health-listen", ":8080", "Listen address of the health server")
-	Server.Flags().Bool("profiling-enable", false, "If set, enable profiling server")
-	Server.Flags().String("profiling-listen", ":6060", "Listen address of the health server")
+	Client.Flags().String("listen", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
+	Client.Flags().String("server", "", "Address of the other end of the bridge")
+	Client.Flags().String("cert", "", "Path to a client certificate for WSS")
+	Client.Flags().String("key", "", "Path to the key for the client certificate")
+	Client.Flags().String("key-pass", "", "Passphrase for the key")
+	Client.Flags().String("ca", "", "Path to a CA to validate server connections")
+	Client.Flags().Bool("insecure-skip-verify", false, "If set, don't validate server's CA. Do not do this.")
+	Client.Flags().Bool("health-enable", false, "If set, start a health server for production deployments")
+	Client.Flags().String("health-listen", ":8080", "Listen address of the health server")
+	Client.Flags().Bool("profiling-enable", false, "If set, enable profiling server")
+	Client.Flags().String("profiling-listen", ":6060", "Listen address of the health server")
 }
 
-// Server is the cobra command to run the server.
-var Server = &cobra.Command{
-	Use:              "server",
+// Client is the cobra command to run the client.
+var Client = &cobra.Command{
+	Use:              "client",
 	Short:            "Start a secure bridge to an MCP server",
 	SilenceUsage:     true,
 	SilenceErrors:    true,
 	TraverseChildren: true,
-	Args:             cobra.MinimumNArgs(1),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := viper.BindPFlags(cmd.PersistentFlags()); err != nil {
 			return err
@@ -48,17 +46,24 @@ var Server = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		listen := viper.GetString("listen")
+		serverURL := viper.GetString("server")
 		certPath := viper.GetString("cert")
 		keyPath := viper.GetString("key")
 		keyPass := viper.GetString("key-pass")
-		clientCAPath := viper.GetString("client-ca")
+		caPath := viper.GetString("client-ca")
+		skipVerify := viper.GetBool("insecure-skip-verify")
 		healthEnabled := viper.GetBool("health-enable")
 		healthListen := viper.GetString("health-listen")
 		profilingEnabled := viper.GetBool("profiling-enable")
 		profilingListen := viper.GetString("profiling-listen")
 
-		tlsConfig := &tls.Config{}
-		var hasTLS bool
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: skipVerify,
+		}
+
+		if skipVerify {
+			slog.Warn("Server certificate validation deactivated. Connection will not be secure")
+		}
 
 		if certPath != "" && keyPath != "" {
 			x509Cert, x509Key, err := tglib.ReadCertificatePEM(certPath, keyPath, keyPass)
@@ -72,24 +77,17 @@ var Server = &cobra.Command{
 			}
 
 			tlsConfig.Certificates = []tls.Certificate{tlsCert}
-			hasTLS = true
 		}
 
-		if clientCAPath != "" {
-			data, err := os.ReadFile(clientCAPath)
+		if caPath != "" {
+			data, err := os.ReadFile(caPath)
 			if err != nil {
-				return fmt.Errorf("unable to read client ca: %w", err)
+				return fmt.Errorf("unable to read server ca: %w", err)
 			}
-			clientPool := x509.NewCertPool()
-			clientPool.AppendCertsFromPEM(data)
+			pool := x509.NewCertPool()
+			pool.AppendCertsFromPEM(data)
 
-			tlsConfig.ClientCAs = clientPool
-			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-			hasTLS = true
-		}
-
-		if !hasTLS {
-			tlsConfig = nil
+			tlsConfig.RootCAs = pool
 		}
 
 		metricsManager := bahamut.NewPrometheusMetricsManager()
@@ -111,12 +109,15 @@ var Server = &cobra.Command{
 			go bahamut.New(opts...).Run(cmd.Context())
 		}
 
-		mcpServer := mcp.Server{Command: args[0], Args: args[1:]}
+		var proxy frontend.Frontend
 
-		slog.Info("WS Server configured", "tls", hasTLS, "listen", listen)
-		slog.Info("MCP Server configured", "command", mcpServer.Command, "args", mcpServer.Args)
-
-		proxy := backend.NewWebSocket(listen, tlsConfig, mcpServer)
+		if listen == "" {
+			slog.Info("Starting Stdio Proxy", "server", serverURL)
+			proxy = frontend.NewStdio(serverURL, tlsConfig)
+		} else {
+			slog.Info("Starting SSE Proxy", "server", serverURL, "listen", listen)
+			proxy = frontend.NewSSE(listen, serverURL, tlsConfig)
+		}
 
 		return proxy.Start(cmd.Context())
 	},
