@@ -10,7 +10,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"go.acuvity.ai/bahamut"
-	"go.acuvity.ai/minibridge/mcp/policer"
+	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/tg/tglib"
 )
 

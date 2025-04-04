@@ -12,8 +12,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	api "go.acuvity.ai/api/apex"
-	"go.acuvity.ai/minibridge/mcp/client"
-	"go.acuvity.ai/minibridge/mcp/policer"
+	"go.acuvity.ai/minibridge/pkgs/client"
+	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/wsc"
 )
 

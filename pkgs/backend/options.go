@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"go.acuvity.ai/minibridge/mcp/policer"
+	"go.acuvity.ai/minibridge/pkgs/policer"
 )
 
 type wsCfg struct {

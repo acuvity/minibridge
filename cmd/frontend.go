@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"go.acuvity.ai/minibridge/mcp/frontend"
+	"go.acuvity.ai/minibridge/pkgs/frontend"
 )
 
 var fFrontend = pflag.NewFlagSet("", pflag.ExitOnError)
