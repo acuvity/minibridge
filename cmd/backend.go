@@ -17,7 +17,7 @@ func init() {
 	fBackend.String("listen", ":8000", "Listen address of the bridge for incoming connections")
 
 	Backend.Flags().AddFlagSet(fBackend)
-	Backend.Flags().AddFlagSet(fTLSServer)
+	Backend.Flags().AddFlagSet(fTLSFrontend)
 	Backend.Flags().AddFlagSet(fHealth)
 	Backend.Flags().AddFlagSet(fProfiler)
 }
@@ -35,7 +35,7 @@ var Backend = &cobra.Command{
 
 		listen := viper.GetString("listen")
 
-		tlsConfig, err := tlsConfigFromFlags(fTLSServer)
+		tlsConfig, err := tlsConfigFromFlags(fTLSFrontend)
 		if err != nil {
 			return err
 		}

@@ -19,7 +19,7 @@ func init() {
 	fFrontend.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
 
 	Frontend.Flags().AddFlagSet(fFrontend)
-	Frontend.Flags().AddFlagSet(fTLSClient)
+	Frontend.Flags().AddFlagSet(fTLSBackend)
 	Frontend.Flags().AddFlagSet(fHealth)
 	Frontend.Flags().AddFlagSet(fProfiler)
 }
@@ -39,7 +39,7 @@ var Frontend = &cobra.Command{
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 
-		tlsConfig, err := tlsConfigFromFlags(fTLSClient)
+		tlsConfig, err := tlsConfigFromFlags(fTLSBackend)
 		if err != nil {
 			return err
 		}

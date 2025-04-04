@@ -28,7 +28,7 @@ func init() {
 	fAIO.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
 
 	AIO.Flags().AddFlagSet(fAIO)
-	AIO.Flags().AddFlagSet(fTLSServer)
+	AIO.Flags().AddFlagSet(fTLSFrontend)
 	AIO.Flags().AddFlagSet(fHealth)
 	AIO.Flags().AddFlagSet(fProfiler)
 }
@@ -52,7 +52,7 @@ var AIO = &cobra.Command{
 			return err
 		}
 
-		frontendTLSConfig, err := tlsConfigFromFlags(fTLSClient)
+		frontendTLSConfig, err := tlsConfigFromFlags(fTLSBackend)
 		if err != nil {
 			return err
 		}

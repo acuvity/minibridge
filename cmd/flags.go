@@ -5,24 +5,24 @@ import (
 )
 
 var (
-	fTLSClient = pflag.NewFlagSet("tlsclient", pflag.ExitOnError)
-	fTLSServer = pflag.NewFlagSet("tlsserver", pflag.ExitOnError)
-	fProfiler  = pflag.NewFlagSet("profile", pflag.ExitOnError)
-	fHealth    = pflag.NewFlagSet("health", pflag.ExitOnError)
+	fTLSBackend  = pflag.NewFlagSet("tlsclient", pflag.ExitOnError)
+	fTLSFrontend = pflag.NewFlagSet("tlsserver", pflag.ExitOnError)
+	fProfiler    = pflag.NewFlagSet("profile", pflag.ExitOnError)
+	fHealth      = pflag.NewFlagSet("health", pflag.ExitOnError)
 )
 
 func init() {
 
-	fTLSServer.String("cert", "", "Path to the server certificate")
-	fTLSServer.String("key", "", "Path to the key for the certificate")
-	fTLSServer.String("key-pass", "", "Passphrase for the key")
-	fTLSClient.String("client-ca", "", "Path to a CA to validate client connections")
+	fTLSFrontend.String("cert", "", "Path to the server certificate")
+	fTLSFrontend.String("key", "", "Path to the key for the certificate")
+	fTLSFrontend.String("key-pass", "", "Passphrase for the key")
+	fTLSFrontend.String("client-ca", "", "Path to a CA to validate client connections")
 
-	fTLSClient.String("cert", "", "Path to the client certificate")
-	fTLSClient.String("key", "", "Path to the key for the certificate")
-	fTLSClient.String("key-pass", "", "Passphrase for the key")
-	fTLSClient.String("ca", "", "Path to a CA to validate server connections")
-	fTLSClient.Bool("insecure-skip-verify", false, "If set, don't validate server's CA. Do not do this.")
+	fTLSBackend.String("cert", "", "Path to the client certificate")
+	fTLSBackend.String("key", "", "Path to the key for the certificate")
+	fTLSBackend.String("key-pass", "", "Passphrase for the key")
+	fTLSBackend.String("ca", "", "Path to a CA to validate server connections")
+	fTLSBackend.Bool("insecure-skip-verify", false, "If set, don't validate server's CA. Do not do this.")
 
 	fHealth.Bool("health-enable", false, "If set, start a health server for production deployments")
 	fHealth.String("health-listen", ":8080", "Listen address of the health server")
