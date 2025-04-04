@@ -1,3 +1,4 @@
 minibridge
+dist
 *.pem
 *.token
