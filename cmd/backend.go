@@ -40,8 +40,7 @@ var Backend = &cobra.Command{
 			return err
 		}
 
-		mm := startHelperServers(cmd.Context())
-		_ = mm // TODO plug that in
+		startHelperServers(cmd.Context())
 
 		mcpServer := mcp.Server{Command: args[0], Args: args[1:]}
 

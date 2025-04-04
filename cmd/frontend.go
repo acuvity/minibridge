@@ -44,8 +44,7 @@ var Frontend = &cobra.Command{
 			return err
 		}
 
-		mm := startHelperServers(cmd.Context())
-		_ = mm // TODO plug that in
+		startHelperServers(cmd.Context())
 
 		var proxy frontend.Frontend
 

@@ -80,7 +80,7 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func startHelperServers(ctx context.Context) bahamut.MetricsManager {
+func startHelperServers(ctx context.Context) bahamut.MetricsManager { // nolint: unparam
 
 	healthEnabled, _ := fHealth.GetBool("health-enable")
 	healthListen, _ := fHealth.GetString("health-listen")
