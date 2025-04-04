@@ -136,6 +136,8 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		case data := <-session.Read():
 
+			slog.Debug("Received data from websocket", "msg", string(data))
+
 			if !bytes.HasSuffix(data, []byte("\n")) {
 				data = append(data, '\n')
 			}
@@ -151,7 +153,6 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				}
 			}
 
-			slog.Debug("Received data from websocket", "msg", string(data))
 			inCh <- data
 
 		case data := <-outCh:
