@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	api "go.acuvity.ai/api/apex"
 	"go.acuvity.ai/minibridge/mcp/client"
 	"go.acuvity.ai/wsc"
 )
@@ -153,6 +154,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					p.policerClient,
 					p.cfg.policerURL,
 					p.cfg.policerToken,
+					api.PoliceRequestTypeInput,
 					data,
 				); err != nil {
 					if errors.Is(err, ErrBlocked) {
@@ -168,7 +170,27 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			inCh <- data
 
 		case data := <-outCh:
+
 			slog.Debug("Received data from MCP Server", "msg", string(data))
+
+			if p.cfg.policerURL != "" {
+				if err := police(
+					req.Context(),
+					p.policerClient,
+					p.cfg.policerURL,
+					p.cfg.policerToken,
+					api.PoliceRequestTypeOutput,
+					data,
+				); err != nil {
+					if errors.Is(err, ErrBlocked) {
+						outCh <- makeMCPError(data, err)
+						continue
+					}
+					slog.Error("Unable to run analysis", err)
+					continue
+				}
+			}
+
 			session.Write(data)
 
 		case data := <-errCh:

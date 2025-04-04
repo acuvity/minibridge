@@ -15,13 +15,18 @@ import (
 
 var ErrBlocked = errors.New("request blocked")
 
-func police(ctx context.Context, client *http.Client, policerURL string, policerToken string, data []byte) error {
+func police(
+	ctx context.Context,
+	client *http.Client,
+	policerURL string,
+	policerToken string,
+	rtype api.PoliceRequestTypeValue,
+	data []byte,
+) error {
 
 	sreq := api.NewPoliceRequest()
-	sreq.Type = api.PoliceRequestTypeInput
-	sreq.Extractions = []*api.ExtractionRequest{
-		{Data: data},
-	}
+	sreq.Type = rtype
+	sreq.Messages = []string{strings.TrimSpace(string(data))}
 
 	// TODO: add a way to let minibridge run the
 	// extraction to retrieve the name/claims from the
