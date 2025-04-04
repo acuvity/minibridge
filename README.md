@@ -161,7 +161,7 @@ For a policy result that denies the request:
 ```json
 {
   "decision": "Deny",
-  "reasons": ["You are not allowed to use this tool"]
+  "reasons": ["You are not allowed to list the tools"]
 }
 ```
 
