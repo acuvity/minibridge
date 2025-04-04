@@ -12,6 +12,9 @@ import (
 )
 
 func init() {
+
+	initSharedFlagSet()
+
 	Root.PersistentFlags().String("log-level", "info", "Set the log level")
 }
 

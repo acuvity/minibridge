@@ -12,23 +12,33 @@ func newSSECfg() sseCfg {
 	}
 }
 
-// SSEOption are options that can be given to NewSSE().
-type SSEOption func(*sseCfg)
+// OptSSE are options that can be given to NewSSE().
+type OptSSE func(*sseCfg)
 
-// SSEOptionSSEEndpoint sets the sse endpoint
+// OptSSEStreamEndpoint sets the sse endpoint
 // where agents can connect to the response stream.
 // Defaults to /sse
-func SSEOptionSSEEndpoint(ep string) SSEOption {
+func OptSSEStreamEndpoint(ep string) OptSSE {
 	return func(cfg *sseCfg) {
 		cfg.sseEndpoint = ep
 	}
 }
 
-// SSEOptionMessageEndpoint sets the message endpoint
+// OptSSEMessageEndpoint sets the message endpoint
 // where agents can post request.
 // Defaults to /messages
-func SSEOptionMessageEndpoint(ep string) SSEOption {
+func OptSSEMessageEndpoint(ep string) OptSSE {
 	return func(cfg *sseCfg) {
 		cfg.messagesEndpoint = ep
 	}
 }
+
+type stdioCfg struct {
+}
+
+func newStdioCfg() stdioCfg {
+	return stdioCfg{}
+}
+
+// OptStdio are options that can be given to NewStdio().
+type OptStdio func(*stdioCfg)

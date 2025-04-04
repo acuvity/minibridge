@@ -9,9 +9,18 @@ var (
 	fTLSFrontend = pflag.NewFlagSet("tlsserver", pflag.ExitOnError)
 	fProfiler    = pflag.NewFlagSet("profile", pflag.ExitOnError)
 	fHealth      = pflag.NewFlagSet("health", pflag.ExitOnError)
+	fApex        = pflag.NewFlagSet("apex", pflag.ExitOnError)
+
+	initialized = false
 )
 
-func init() {
+func initSharedFlagSet() {
+
+	if initialized {
+		return
+	}
+
+	initialized = true
 
 	fTLSFrontend.String("cert", "", "Path to the server certificate")
 	fTLSFrontend.String("key", "", "Path to the key for the certificate")
@@ -29,4 +38,9 @@ func init() {
 
 	fProfiler.Bool("profiling-enable", false, "If set, enable profiling server")
 	fProfiler.String("profiling-listen", ":6060", "Listen address of the health server")
+
+	fApex.String("apex-url", "", "Address of the Apex to send the traffic to")
+	fApex.String("apex-token", "", "Token to use to authenticate via Apex")
+	fApex.String("apex-ca", "", "CA to trust Apex certificates")
+	fApex.String("apex-insecure-skip-verify", "", "Do not validate Apex CA. Do not do this")
 }

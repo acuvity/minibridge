@@ -20,6 +20,7 @@ type stdioFrontend struct {
 	backendURL string
 	session    wsc.Websocket
 	tlsConfig  *tls.Config
+	cfg        stdioCfg
 
 	sync.RWMutex
 }
@@ -30,10 +31,17 @@ type stdioFrontend struct {
 //
 // A single session to the backend will be created and it will
 // reconnect in case of disconnection.
-func NewStdio(backend string, tlsConfig *tls.Config) Frontend {
+func NewStdio(backend string, tlsConfig *tls.Config, opts ...OptStdio) Frontend {
+
+	cfg := newStdioCfg()
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	return &stdioFrontend{
 		backendURL: backend,
 		tlsConfig:  tlsConfig,
+		cfg:        cfg,
 	}
 }
 

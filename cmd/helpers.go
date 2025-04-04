@@ -110,3 +110,33 @@ func startHelperServers(ctx context.Context) bahamut.MetricsManager { // nolint:
 
 	return metricsManager
 }
+
+func makeApexTLSConfig() (*tls.Config, error) {
+
+	apexCA, _ := fApex.GetString("apex-ca")
+	apexSkip, _ := fApex.GetBool("apex-insecure-skip-verify")
+
+	if apexCA == "" && !apexSkip {
+		return nil, nil
+	}
+
+	var pool *x509.CertPool
+	if apexCA != "" {
+		caData, err := os.ReadFile(apexCA)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read apex CA: %w", err)
+		}
+		pool.AppendCertsFromPEM(caData)
+	} else {
+		var err error
+		pool, err = x509.SystemCertPool()
+		if err != nil {
+			return nil, fmt.Errorf("unable to load system ca pool: %w", err)
+		}
+	}
+
+	return &tls.Config{
+		InsecureSkipVerify: apexSkip,
+		RootCAs:            pool,
+	}, nil
+}

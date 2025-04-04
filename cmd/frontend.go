@@ -13,6 +13,8 @@ var fFrontend = pflag.NewFlagSet("", pflag.ExitOnError)
 
 func init() {
 
+	initSharedFlagSet()
+
 	fFrontend.String("listen", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
 	fFrontend.String("backend", "", "Address of the minibridge backend")
 	fFrontend.String("endpoint-messages", "/message", "When using HTTP, sets the endpoint to post messages")
@@ -49,10 +51,27 @@ var Frontend = &cobra.Command{
 		var proxy frontend.Frontend
 
 		if listen != "" {
-			slog.Info("Starting frontend", "mode", "sse", "backend", backendURL, "listen", listen, "sse", sseEndpoint, "messages", messageEndpoint)
-			proxy = frontend.NewSSE(listen, backendURL, tlsConfig, frontend.SSEOptionSSEEndpoint(sseEndpoint), frontend.SSEOptionMessageEndpoint(messageEndpoint))
+
+			slog.Info("Starting frontend",
+				"mode", "sse",
+				"backend", backendURL,
+				"listen", listen,
+				"sse", sseEndpoint,
+				"messages", messageEndpoint,
+			)
+
+			proxy = frontend.NewSSE(listen, backendURL, tlsConfig,
+				frontend.OptSSEStreamEndpoint(sseEndpoint),
+				frontend.OptSSEMessageEndpoint(messageEndpoint),
+			)
+
 		} else {
-			slog.Info("Starting frontend", "mode", "stdio", "backend", backendURL)
+
+			slog.Info("Starting frontend",
+				"mode", "stdio",
+				"backend", backendURL,
+			)
+
 			proxy = frontend.NewStdio(backendURL, tlsConfig)
 		}
 

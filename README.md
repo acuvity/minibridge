@@ -14,22 +14,31 @@ version 2024-11-05. Support for 2025-03-26 is on the way.
 
 > NOTE: minibridge is still under active development.
 
+## All In One
+
+Minibridge can operate as a single gateway to be placed in front of a stdio MCP
+Server.
+
+start everything as a single process:
+
+minibridge aio --listen :8000 -- npx -y @modelcontextprotocol/server-filesystem /tmp
+
+This will start both frontend and backend in a single process. This is useful in
+some ocasions.
+
+The flow will look like the following:
+
+    agent -[http+sse]-> minibridge -[stdio]-> mcpserver
+
 ## Backend
 
-To start a a filesystem MSP server:
+Starting the backend will run an MCP server and expose its API over a
+websocket-based API. It allows to configure TLS with or without client
+certificates.
+
+To start a a filesystem MCP server:
 
     minibridge backend -- npx -y @modelcontextprotocol/server-filesystem /tmp
-
-To start a a file-server mcp using WSS:
-
-    minibridge backend --cert server-cert.pem --key server-key.pem -- npx -y @modelcontextprotocol/server-filesystem /tmp
-
-To start a a file-server mcp using WSS and client certificates:
-
-    minibridge backend \
-      --cert server-cert.pem \
-      --key server-key.pem \
-      --client-ca client-ca.pem -- npx -y @modelcontextprotocol/server-filesystem /tmp
 
 You can now connect directly using a websocket client:
 
@@ -37,16 +46,21 @@ You can now connect directly using a websocket client:
 
 > NOTE: use wss scheme if you have started minibridge backend with TLS.
 
+> NOTE: Today, minibridge backend only supports MCP server over stdio.
+
+The flow will look like the following:
+
+    agent -[websocket]-> minibridge -[stdio]-> mcpserver
+
 ## Frontend
 
 While websockets remove a lot of issue plain POST+SSE brings, it is not part of
-the MCP protocol yet. To be backward compatible with existing agent, frontend
+the MCP protocol yet. To be backward compatible with existing agents, frontend
 can expose a local POST+SSE, HTTP+STREAM (soon) or plain STDIO to your agent,
 and will deal with forwarding the data accordingly to the minibridge backend,
 using websockets and HTTPS transparently.
 
 ### Stdio Frontend
-
 
 To start an stdio frontend:
 
@@ -75,15 +89,15 @@ The flow will look like the following:
 
     agent -[http+sse]-> minibridge -[websocket]-> minibridge -[stdio]-> mcpserver
 
-## All In One
+## Acuvity Integration
 
-To start everything as a single process:
+While minibridge by itself already brings serious features like strong client
+authentication, websocket by itself, it can be used with the Acuvity platform.
+With such an integration the following features will be available:
 
-    minibridge aio --listen :8081 -- npx -y @modelcontextprotocol/server-filesystem /tmp
-
-This will start both frontend and backend in a single process. This is useful in
-some ocasions.
-
-The flow will look like the following:
-
-    agent -[http+sse]-> minibridge -[stdio]-> mcpserver
+* bearer authn
+* rego based authz
+* analysis and logging of inputs
+* tracing of the requests
+* redactions of sensitive data
+* much more

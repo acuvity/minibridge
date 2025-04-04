@@ -23,11 +23,14 @@ var fAIO = pflag.NewFlagSet("aio", pflag.ExitOnError)
 
 func init() {
 
+	initSharedFlagSet()
+
 	fAIO.String("listen", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
 	fAIO.String("endpoint-messages", "/message", "When using HTTP, sets the endpoint to post messages")
 	fAIO.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
 
 	AIO.Flags().AddFlagSet(fAIO)
+	AIO.Flags().AddFlagSet(fApex)
 	AIO.Flags().AddFlagSet(fTLSFrontend)
 	AIO.Flags().AddFlagSet(fHealth)
 	AIO.Flags().AddFlagSet(fProfiler)
@@ -46,8 +49,15 @@ var AIO = &cobra.Command{
 		listen := viper.GetString("listen")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
+		apexURL := viper.GetString("apex-url")
+		apexToken := viper.GetString("apex-token")
 
 		backendTLSConfig, trustPool, err := makeTempTLSConfig()
+		if err != nil {
+			return err
+		}
+
+		apexTLSConfig, err := makeApexTLSConfig()
 		if err != nil {
 			return err
 		}
@@ -62,8 +72,7 @@ var AIO = &cobra.Command{
 
 		frontendTLSConfig.RootCAs = trustPool
 
-		mm := startHelperServers(cmd.Context())
-		_ = mm // TODO plug that in
+		startHelperServers(cmd.Context())
 
 		iport, err := randomFreePort()
 		if err != nil {
@@ -77,19 +86,42 @@ var AIO = &cobra.Command{
 		eg.Go(func() error {
 
 			mcpServer := mcp.Server{Command: args[0], Args: args[1:]}
-			slog.Info("Starting backend", "command", mcpServer.Command, "args", mcpServer.Args)
+			slog.Info("Starting backend",
+				"command", mcpServer.Command,
+				"args", mcpServer.Args,
+				"apex", apexURL,
+			)
 
-			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer)
+			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
+				backend.OptWSApexURL(apexURL, apexToken),
+				backend.OptWSApexTLSConfig(apexTLSConfig),
+			)
 			return proxy.Start(cmd.Context())
 		})
 
 		eg.Go(func() error {
+
 			var proxy frontend.Frontend
+
 			if listen != "" {
-				slog.Info("Starting frontend", "mode", "sse", "listen", listen, "sse", sseEndpoint, "messages", messageEndpoint)
-				proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig, frontend.SSEOptionSSEEndpoint(sseEndpoint), frontend.SSEOptionMessageEndpoint(messageEndpoint))
+
+				slog.Info("Starting frontend",
+					"mode", "sse",
+					"listen", listen,
+					"sse", sseEndpoint,
+					"messages", messageEndpoint,
+				)
+
+				proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig,
+					frontend.OptSSEStreamEndpoint(sseEndpoint),
+					frontend.OptSSEMessageEndpoint(messageEndpoint),
+				)
 			} else {
-				slog.Info("Starting frontend", "mode", "stdio")
+
+				slog.Info("Starting frontend",
+					"mode", "stdio",
+				)
+
 				proxy = frontend.NewStdio(backendURL, frontendTLSConfig)
 			}
 

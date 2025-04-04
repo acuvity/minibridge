@@ -14,9 +14,12 @@ var fBackend = pflag.NewFlagSet("backend", pflag.ExitOnError)
 
 func init() {
 
+	initSharedFlagSet()
+
 	fBackend.String("listen", ":8000", "Listen address of the bridge for incoming connections")
 
 	Backend.Flags().AddFlagSet(fBackend)
+	Backend.Flags().AddFlagSet(fApex)
 	Backend.Flags().AddFlagSet(fTLSFrontend)
 	Backend.Flags().AddFlagSet(fHealth)
 	Backend.Flags().AddFlagSet(fProfiler)
@@ -34,8 +37,15 @@ var Backend = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		listen := viper.GetString("listen")
+		apexURL := viper.GetString("apex-url")
+		apexToken := viper.GetString("apex-token")
 
-		tlsConfig, err := tlsConfigFromFlags(fTLSFrontend)
+		backendTLSConfig, err := tlsConfigFromFlags(fTLSFrontend)
+		if err != nil {
+			return err
+		}
+
+		apexTLSConfig, err := makeApexTLSConfig()
 		if err != nil {
 			return err
 		}
@@ -44,10 +54,19 @@ var Backend = &cobra.Command{
 
 		mcpServer := mcp.Server{Command: args[0], Args: args[1:]}
 
-		slog.Info("WS Server configured", "tls", tlsConfig != nil, "listen", listen)
-		slog.Info("MCP Server configured", "command", mcpServer.Command, "args", mcpServer.Args)
+		slog.Info("Backend configured",
+			"mode", "ws",
+			"command", mcpServer.Command,
+			"args", mcpServer.Args,
+			"tls", backendTLSConfig != nil,
+			"listen", listen,
+			"apex", apexURL,
+		)
 
-		proxy := backend.NewWebSocket(listen, tlsConfig, mcpServer)
+		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,
+			backend.OptWSApexURL(apexURL, apexToken),
+			backend.OptWSApexTLSConfig(apexTLSConfig),
+		)
 
 		return proxy.Start(cmd.Context())
 	},

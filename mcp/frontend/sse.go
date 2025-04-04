@@ -29,7 +29,7 @@ type sseFrontend struct {
 // and will connect to the given minibridge backend using the given options.
 // For every new connection to the /sse endpoint, a new websocket connection will
 // be initiated to the backend, thus keeping track of the session.
-func NewSSE(addr string, backend string, tlsConfig *tls.Config, opts ...SSEOption) Frontend {
+func NewSSE(addr string, backend string, tlsConfig *tls.Config, opts ...OptSSE) Frontend {
 
 	cfg := newSSECfg()
 	for _, o := range opts {

@@ -16,19 +16,35 @@ import (
 )
 
 type wsBackend struct {
-	server    *http.Server
-	mcpServer mcp.Server
-	clients   chan *mcp.StdioClient
+	cfg        wsCfg
+	clients    chan *mcp.StdioClient
+	mcpServer  mcp.Server
+	server     *http.Server
+	apexClient *http.Client
 }
 
 // NewWebSocket retrurns a new backend.Backend exposing a Websocket to communicate
 // with the given mcp.Server. It will use the given *tls.Config for everything TLS.
 // It tls.Config is nil, the server will run as plain HTTP.
-func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer mcp.Server) Backend {
+func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer mcp.Server, opts ...OptWS) Backend {
+
+	cfg := newWSCfg()
+	for _, o := range opts {
+		o(&cfg)
+	}
 
 	p := &wsBackend{
 		mcpServer: mcpServer,
 		clients:   make(chan *mcp.StdioClient),
+		cfg:       cfg,
+	}
+
+	if cfg.apexURL != "" {
+		p.apexClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: cfg.apexTLSConfig,
+			},
+		}
 	}
 
 	p.server = &http.Server{
@@ -129,6 +145,17 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			if !bytes.HasSuffix(data, []byte("\n")) {
 				data = append(data, '\n')
+			}
+
+			if p.cfg.apexURL != "" {
+				if err := analyze(req.Context(), p.apexClient, p.cfg.apexURL, p.cfg.apexToken, data); err != nil {
+					if errors.Is(err, ErrBlocked) {
+						outCh <- makeMCPError(data, err)
+						continue
+					}
+					slog.Error("Unable to run analysis", err)
+					continue
+				}
 			}
 
 			slog.Debug("Received data from websocket", "msg", string(data))
