@@ -6,7 +6,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"go.acuvity.ai/minibridge/cmd"
+	"go.acuvity.ai/minibridge/internal/cmd"
 )
 
 func main() {
