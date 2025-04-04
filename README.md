@@ -174,3 +174,13 @@ Example:
 
     $ mcptools tools http://127.0.0.1:8000
     error: RPC error 451: request blocked: ForbiddenUser: I'm afraid you cannot do this, Dave
+
+## Todos
+
+Minibridge is still missing the following features:
+
+- [ ] Transport user information over the websocket channel
+- [ ] Support for user extraction to pass to the policer
+- [ ] Optimize communications between front/back in aio mode
+- [ ] Plug in prometheus metrics
+- [ ] Support connecting to an MCP server using HTTP
