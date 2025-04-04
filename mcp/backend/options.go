@@ -1,13 +1,11 @@
 package backend
 
 import (
-	"crypto/tls"
+	"go.acuvity.ai/minibridge/mcp/policer"
 )
 
 type wsCfg struct {
-	policerURL       string
-	policerToken     string
-	policerTLSConfig *tls.Config
+	policer policer.Policer
 }
 
 func newWSCfg() wsCfg {
@@ -17,18 +15,9 @@ func newWSCfg() wsCfg {
 // OptWS are options that can be given to NewStdio().
 type OptWS func(*wsCfg)
 
-// OptWSPolicerURL sets the Policer URL to forward the traffic to.
-func OptWSPolicerURL(url string, token string) OptWS {
+// OptWSPolicer sets the Policer to forward the traffic to.
+func OptWSPolicer(policer policer.Policer) OptWS {
 	return func(cfg *wsCfg) {
-		cfg.policerURL = url
-		cfg.policerToken = token
-	}
-}
-
-// OptWSPolicerTLSConfig sets the *tls.Config to use to
-// contact the Policer.
-func OptWSPolicerTLSConfig(tlsConfig *tls.Config) OptWS {
-	return func(cfg *wsCfg) {
-		cfg.policerTLSConfig = tlsConfig
+		cfg.policer = policer
 	}
 }

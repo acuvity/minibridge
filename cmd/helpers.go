@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"go.acuvity.ai/bahamut"
+	"go.acuvity.ai/minibridge/mcp/policer"
 	"go.acuvity.ai/tg/tglib"
 )
 
@@ -111,12 +112,14 @@ func startHelperServers(ctx context.Context) bahamut.MetricsManager { // nolint:
 	return metricsManager
 }
 
-func makePolicerTLSConfig() (*tls.Config, error) {
+func makePolicer() (policer.Policer, error) {
 
-	policerCA, _ := fPolice.GetString("policer-ca")
-	policerSkip, _ := fPolice.GetBool("policer-insecure-skip-verify")
+	policerCA, _ := fPolicer.GetString("policer-ca")
+	policerSkip, _ := fPolicer.GetBool("policer-insecure-skip-verify")
+	policerURL, _ := fPolicer.GetString("policer-url")
+	policerToken, _ := fPolicer.GetString("policer-token")
 
-	if policerCA == "" && !policerSkip {
+	if policerURL == "" {
 		return nil, nil
 	}
 
@@ -135,8 +138,10 @@ func makePolicerTLSConfig() (*tls.Config, error) {
 		}
 	}
 
-	return &tls.Config{
+	tlsConfig := &tls.Config{
 		InsecureSkipVerify: policerSkip,
 		RootCAs:            pool,
-	}, nil
+	}
+
+	return policer.New(policerURL, policerToken, tlsConfig), nil
 }

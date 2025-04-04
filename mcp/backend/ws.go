@@ -13,15 +13,15 @@ import (
 	"github.com/gorilla/websocket"
 	api "go.acuvity.ai/api/apex"
 	"go.acuvity.ai/minibridge/mcp/client"
+	"go.acuvity.ai/minibridge/mcp/policer"
 	"go.acuvity.ai/wsc"
 )
 
 type wsBackend struct {
-	cfg           wsCfg
-	clients       chan client.Client
-	mcpServer     client.MCPServer
-	server        *http.Server
-	policerClient *http.Client
+	cfg       wsCfg
+	clients   chan client.Client
+	mcpServer client.MCPServer
+	server    *http.Server
 }
 
 // NewWebSocket retrurns a new backend.Backend exposing a Websocket to communicate
@@ -38,14 +38,6 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServ
 		mcpServer: mcpServer,
 		clients:   make(chan client.Client),
 		cfg:       cfg,
-	}
-
-	if cfg.policerURL != "" {
-		p.policerClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: cfg.policerTLSConfig,
-			},
-		}
 	}
 
 	p.server = &http.Server{
@@ -148,16 +140,9 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				data = append(data, '\n')
 			}
 
-			if p.cfg.policerURL != "" {
-				if err := police(
-					req.Context(),
-					p.policerClient,
-					p.cfg.policerURL,
-					p.cfg.policerToken,
-					api.PoliceRequestTypeInput,
-					data,
-				); err != nil {
-					if errors.Is(err, ErrBlocked) {
+			if pol := p.cfg.policer; pol != nil {
+				if err := pol.Police(req.Context(), api.PoliceRequestTypeInput, data); err != nil {
+					if errors.Is(err, policer.ErrBlocked) {
 						outCh <- makeMCPError(data, err)
 						continue
 					}
@@ -173,16 +158,9 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from MCP Server", "msg", string(data))
 
-			if p.cfg.policerURL != "" {
-				if err := police(
-					req.Context(),
-					p.policerClient,
-					p.cfg.policerURL,
-					p.cfg.policerToken,
-					api.PoliceRequestTypeOutput,
-					data,
-				); err != nil {
-					if errors.Is(err, ErrBlocked) {
+			if pol := p.cfg.policer; pol != nil {
+				if err := pol.Police(req.Context(), api.PoliceRequestTypeOutput, data); err != nil {
+					if errors.Is(err, policer.ErrBlocked) {
 						outCh <- makeMCPError(data, err)
 						continue
 					}

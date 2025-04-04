@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/spf13/cobra"
@@ -19,7 +20,7 @@ func init() {
 	fBackend.String("listen", ":8000", "Listen address of the bridge for incoming connections")
 
 	Backend.Flags().AddFlagSet(fBackend)
-	Backend.Flags().AddFlagSet(fPolice)
+	Backend.Flags().AddFlagSet(fPolicer)
 	Backend.Flags().AddFlagSet(fTLSFrontend)
 	Backend.Flags().AddFlagSet(fHealth)
 	Backend.Flags().AddFlagSet(fProfiler)
@@ -38,16 +39,15 @@ var Backend = &cobra.Command{
 
 		listen := viper.GetString("listen")
 		policerURL := viper.GetString("policer-url")
-		policerToken := viper.GetString("policer-token")
 
 		backendTLSConfig, err := tlsConfigFromFlags(fTLSFrontend)
 		if err != nil {
 			return err
 		}
 
-		policerTLSConfig, err := makePolicerTLSConfig()
+		policer, err := makePolicer()
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to make policer: %w", err)
 		}
 
 		startHelperServers(cmd.Context())
@@ -64,8 +64,7 @@ var Backend = &cobra.Command{
 		)
 
 		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,
-			backend.OptWSPolicerURL(policerURL, policerToken),
-			backend.OptWSPolicerTLSConfig(policerTLSConfig),
+			backend.OptWSPolicer(policer),
 		)
 
 		return proxy.Start(cmd.Context())

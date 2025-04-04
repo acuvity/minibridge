@@ -30,7 +30,7 @@ func init() {
 	fAIO.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
 
 	AIO.Flags().AddFlagSet(fAIO)
-	AIO.Flags().AddFlagSet(fPolice)
+	AIO.Flags().AddFlagSet(fPolicer)
 	AIO.Flags().AddFlagSet(fTLSFrontend)
 	AIO.Flags().AddFlagSet(fHealth)
 	AIO.Flags().AddFlagSet(fProfiler)
@@ -50,16 +50,15 @@ var AIO = &cobra.Command{
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 		policerURL := viper.GetString("policer-url")
-		policerToken := viper.GetString("policer-token")
 
 		backendTLSConfig, trustPool, err := makeTempTLSConfig()
 		if err != nil {
 			return err
 		}
 
-		policerTLSConfig, err := makePolicerTLSConfig()
+		policer, err := makePolicer()
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to make policer: %w", err)
 		}
 
 		frontendTLSConfig, err := tlsConfigFromFlags(fTLSBackend)
@@ -93,8 +92,7 @@ var AIO = &cobra.Command{
 			)
 
 			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
-				backend.OptWSPolicerURL(policerURL, policerToken),
-				backend.OptWSPolicerTLSConfig(policerTLSConfig),
+				backend.OptWSPolicer(policer),
 			)
 			return proxy.Start(cmd.Context())
 		})

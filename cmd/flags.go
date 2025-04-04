@@ -9,7 +9,7 @@ var (
 	fTLSFrontend = pflag.NewFlagSet("tlsserver", pflag.ExitOnError)
 	fProfiler    = pflag.NewFlagSet("profile", pflag.ExitOnError)
 	fHealth      = pflag.NewFlagSet("health", pflag.ExitOnError)
-	fPolice      = pflag.NewFlagSet("police", pflag.ExitOnError)
+	fPolicer     = pflag.NewFlagSet("police", pflag.ExitOnError)
 
 	initialized = false
 )
@@ -39,8 +39,8 @@ func initSharedFlagSet() {
 	fProfiler.Bool("profiling-enable", false, "If set, enable profiling server")
 	fProfiler.String("profiling-listen", ":6060", "Listen address of the health server")
 
-	fPolice.String("policer-url", "", "Address of a Policer to send the traffic to for authentication and/or analysis")
-	fPolice.String("policer-token", "", "Token to use to authenticate against the Policer")
-	fPolice.String("policer-ca", "", "CA to trust Policer server certificates")
-	fPolice.String("policer-insecure-skip-verify", "", "Do not validate Policer CA. Do not do this")
+	fPolicer.String("policer-url", "", "Address of a Policer to send the traffic to for authentication and/or analysis")
+	fPolicer.String("policer-token", "", "Token to use to authenticate against the Policer")
+	fPolicer.String("policer-ca", "", "CA to trust Policer server certificates")
+	fPolicer.String("policer-insecure-skip-verify", "", "Do not validate Policer CA. Do not do this")
 }

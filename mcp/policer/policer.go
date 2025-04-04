@@ -1,8 +1,9 @@
-package backend
+package policer
 
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -15,14 +16,27 @@ import (
 
 var ErrBlocked = errors.New("request blocked")
 
-func police(
-	ctx context.Context,
-	client *http.Client,
-	policerURL string,
-	policerToken string,
-	rtype api.PoliceRequestTypeValue,
-	data []byte,
-) error {
+type policer struct {
+	endpoint string
+	token    string
+	client   *http.Client
+}
+
+// New returns a new Policer.
+func New(endpoint string, token string, tlsConfig *tls.Config) Policer {
+
+	return &policer{
+		endpoint: endpoint,
+		token:    token,
+		client: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConfig,
+			},
+		},
+	}
+}
+
+func (p *policer) Police(ctx context.Context, rtype api.PoliceRequestTypeValue, data []byte) error {
 
 	sreq := api.NewPoliceRequest()
 	sreq.Type = rtype
@@ -42,16 +56,16 @@ func police(
 		return fmt.Errorf("unable to encode scan request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, policerURL, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint, bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("unable to create new http request: %w", err)
 	}
 
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", policerToken))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", p.token))
 
-	resp, err := client.Do(req)
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("unable to send request: %w", err)
 	}
@@ -76,19 +90,4 @@ func police(
 	}
 
 	return nil
-}
-
-func makeMCPError(data []byte, err error) []byte {
-
-	s := struct {
-		ID any `json:"id"`
-	}{}
-	_ = elemental.Decode(elemental.EncodingTypeJSON, data, &s)
-
-	switch s.ID.(type) {
-	case string:
-		return fmt.Appendf([]byte{}, `{"jsonrpc":"2.0","id":"%s","error":{"code":451,"message":"%s"}}`, s.ID, err.Error())
-	default:
-		return fmt.Appendf([]byte{}, `{"jsonrpc":"2.0","id":%d,"error":{"code":451,"message":"%s"}}`, s.ID, err.Error())
-	}
 }
