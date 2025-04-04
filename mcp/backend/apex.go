@@ -15,19 +15,22 @@ import (
 
 var ErrBlocked = errors.New("request blocked")
 
-func analyze(
-	ctx context.Context,
-	client *http.Client,
-	apexURL string,
-	apexToken string,
-	data []byte,
-) error {
+func analyze(ctx context.Context, client *http.Client, apexURL string, apexToken string, data []byte) error {
 
 	sreq := api.NewPoliceRequest()
 	sreq.Type = api.PoliceRequestTypeInput
 	sreq.Extractions = []*api.ExtractionRequest{
 		{Data: data},
 	}
+
+	// TODO: add a way to let minibridge run the
+	// extraction to retrieve the name/claims from the
+	// request. This requires https://github.com/acuvity/acuvity/pull/1923
+	//
+	// sreq.User = &api.PoliceExternalUser{
+	// 	Name:   "joe",
+	// 	Claims: []string{"@org=acuvity.ai", "@scope=apps"},
+	// }
 
 	body, err := elemental.Encode(elemental.EncodingTypeJSON, sreq)
 	if err != nil {
