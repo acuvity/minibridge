@@ -28,7 +28,11 @@ which can be useful in certain scenarios.
 
 The flow will look like the following:
 
-    agent -[http+sse]-> minibridge -[stdio]-> mcpserver
+```mermaid
+flowchart LR
+    agent -- http+sse --> minibridge
+    minibridge -- stdio --> mcpserver
+```
 
 ## Backend
 
@@ -50,7 +54,11 @@ You can now connect directly using a websocket client:
 
 The flow will look like the following:
 
-    agent -[websocket]-> minibridge -[stdio]-> mcpserver
+```mermaid
+flowchart LR
+    agent -- websocket --> minibridge
+    minibridge -- stdio --> mcpserver
+```
 
 ## Frontend
 
@@ -72,7 +80,12 @@ automatically reconnect in case of failures.
 
 The flow will look like the following:
 
-    agent -[stdio]-> minibridge -[websocket]-> minibridge -[stdio]-> mcpserver
+```mermaid
+flowchart LR
+    agent -- stdio --> mb1[minibridge]
+    mb1 -- websocket --> mb2[minibridge]
+    mb2 -- stdio --> mcpserver
+```
 
 ### SSE Frontend
 
@@ -87,7 +100,12 @@ active streams will be terminated in the event of a network failure.
 
 The flow will look like the following:
 
-    agent -[http+sse]-> minibridge -[websocket]-> minibridge -[stdio]-> mcpserver
+```mermaid
+flowchart LR
+    agent -- http+sse --> mb1[minibridge]
+    mb1 -- websocket --> mb2[minibridge]
+    mb2 -- stdio --> mcpserver
+```
 
 ## Acuvity Integration
 
