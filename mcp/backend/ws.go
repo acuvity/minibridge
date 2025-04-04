@@ -16,11 +16,11 @@ import (
 )
 
 type wsBackend struct {
-	cfg        wsCfg
-	clients    chan *mcp.StdioClient
-	mcpServer  mcp.Server
-	server     *http.Server
-	apexClient *http.Client
+	cfg           wsCfg
+	clients       chan *mcp.StdioClient
+	mcpServer     mcp.Server
+	server        *http.Server
+	policerClient *http.Client
 }
 
 // NewWebSocket retrurns a new backend.Backend exposing a Websocket to communicate
@@ -39,10 +39,10 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer mcp.Server, op
 		cfg:       cfg,
 	}
 
-	if cfg.apexURL != "" {
-		p.apexClient = &http.Client{
+	if cfg.policerURL != "" {
+		p.policerClient = &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig: cfg.apexTLSConfig,
+				TLSClientConfig: cfg.policerTLSConfig,
 			},
 		}
 	}
@@ -147,8 +147,14 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				data = append(data, '\n')
 			}
 
-			if p.cfg.apexURL != "" {
-				if err := analyze(req.Context(), p.apexClient, p.cfg.apexURL, p.cfg.apexToken, data); err != nil {
+			if p.cfg.policerURL != "" {
+				if err := analyze(
+					req.Context(),
+					p.policerClient,
+					p.cfg.policerURL,
+					p.cfg.policerToken,
+					data,
+				); err != nil {
 					if errors.Is(err, ErrBlocked) {
 						outCh <- makeMCPError(data, err)
 						continue

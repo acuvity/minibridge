@@ -111,20 +111,20 @@ func startHelperServers(ctx context.Context) bahamut.MetricsManager { // nolint:
 	return metricsManager
 }
 
-func makeApexTLSConfig() (*tls.Config, error) {
+func makePolicerTLSConfig() (*tls.Config, error) {
 
-	apexCA, _ := fApex.GetString("apex-ca")
-	apexSkip, _ := fApex.GetBool("apex-insecure-skip-verify")
+	policerCA, _ := fPolice.GetString("policer-ca")
+	policerSkip, _ := fPolice.GetBool("policer-insecure-skip-verify")
 
-	if apexCA == "" && !apexSkip {
+	if policerCA == "" && !policerSkip {
 		return nil, nil
 	}
 
 	var pool *x509.CertPool
-	if apexCA != "" {
-		caData, err := os.ReadFile(apexCA)
+	if policerCA != "" {
+		caData, err := os.ReadFile(policerCA)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read apex CA: %w", err)
+			return nil, fmt.Errorf("unable to read policer CA: %w", err)
 		}
 		pool.AppendCertsFromPEM(caData)
 	} else {
@@ -136,7 +136,7 @@ func makeApexTLSConfig() (*tls.Config, error) {
 	}
 
 	return &tls.Config{
-		InsecureSkipVerify: apexSkip,
+		InsecureSkipVerify: policerSkip,
 		RootCAs:            pool,
 	}, nil
 }

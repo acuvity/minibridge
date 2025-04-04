@@ -130,11 +130,10 @@ Next, generate an App Token using the following command:
 You can then start Minibridge, using either the aio or backend subcommand, with
 the following arguments:
 
-    minibridge aio --apex-url id.acuvity.ai --apex-token $APPTOKEN
+    minibridge aio --policer-url https://policer.acme.com/police --policer-token $APPTOKEN
 
-Once integrated, any command received by the backend is first forwarded to Apex
-(Acuvity’s policy engine) for analysis. Apex evaluates the request against the
-configured security and access policies.
+Once integrated, any command received by the backend is first forwarded to a
+Policer for authentication and/or analysis.
 
 If the request is denied, Minibridge will not forward it to the MCP server.
 Instead, it will return a descriptive MCP error to the client, indicating why

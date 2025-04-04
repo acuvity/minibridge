@@ -19,7 +19,7 @@ func init() {
 	fBackend.String("listen", ":8000", "Listen address of the bridge for incoming connections")
 
 	Backend.Flags().AddFlagSet(fBackend)
-	Backend.Flags().AddFlagSet(fApex)
+	Backend.Flags().AddFlagSet(fPolice)
 	Backend.Flags().AddFlagSet(fTLSFrontend)
 	Backend.Flags().AddFlagSet(fHealth)
 	Backend.Flags().AddFlagSet(fProfiler)
@@ -37,15 +37,15 @@ var Backend = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		listen := viper.GetString("listen")
-		apexURL := viper.GetString("apex-url")
-		apexToken := viper.GetString("apex-token")
+		policerURL := viper.GetString("policer-url")
+		policerToken := viper.GetString("policer-token")
 
 		backendTLSConfig, err := tlsConfigFromFlags(fTLSFrontend)
 		if err != nil {
 			return err
 		}
 
-		apexTLSConfig, err := makeApexTLSConfig()
+		policerTLSConfig, err := makePolicerTLSConfig()
 		if err != nil {
 			return err
 		}
@@ -60,12 +60,12 @@ var Backend = &cobra.Command{
 			"args", mcpServer.Args,
 			"tls", backendTLSConfig != nil,
 			"listen", listen,
-			"apex", apexURL,
+			"policer", policerURL,
 		)
 
 		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,
-			backend.OptWSApexURL(apexURL, apexToken),
-			backend.OptWSApexTLSConfig(apexTLSConfig),
+			backend.OptWSPolicerURL(policerURL, policerToken),
+			backend.OptWSPolicerTLSConfig(policerTLSConfig),
 		)
 
 		return proxy.Start(cmd.Context())

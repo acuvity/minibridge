@@ -30,7 +30,7 @@ func init() {
 	fAIO.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
 
 	AIO.Flags().AddFlagSet(fAIO)
-	AIO.Flags().AddFlagSet(fApex)
+	AIO.Flags().AddFlagSet(fPolice)
 	AIO.Flags().AddFlagSet(fTLSFrontend)
 	AIO.Flags().AddFlagSet(fHealth)
 	AIO.Flags().AddFlagSet(fProfiler)
@@ -49,15 +49,15 @@ var AIO = &cobra.Command{
 		listen := viper.GetString("listen")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
-		apexURL := viper.GetString("apex-url")
-		apexToken := viper.GetString("apex-token")
+		policerURL := viper.GetString("policer-url")
+		policerToken := viper.GetString("policer-token")
 
 		backendTLSConfig, trustPool, err := makeTempTLSConfig()
 		if err != nil {
 			return err
 		}
 
-		apexTLSConfig, err := makeApexTLSConfig()
+		policerTLSConfig, err := makePolicerTLSConfig()
 		if err != nil {
 			return err
 		}
@@ -89,12 +89,12 @@ var AIO = &cobra.Command{
 			slog.Info("Starting backend",
 				"command", mcpServer.Command,
 				"args", mcpServer.Args,
-				"apex", apexURL,
+				"policer", policerURL,
 			)
 
 			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
-				backend.OptWSApexURL(apexURL, apexToken),
-				backend.OptWSApexTLSConfig(apexTLSConfig),
+				backend.OptWSPolicerURL(policerURL, policerToken),
+				backend.OptWSPolicerTLSConfig(policerTLSConfig),
 			)
 			return proxy.Start(cmd.Context())
 		})

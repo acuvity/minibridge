@@ -15,7 +15,7 @@ import (
 
 var ErrBlocked = errors.New("request blocked")
 
-func analyze(ctx context.Context, client *http.Client, apexURL string, apexToken string, data []byte) error {
+func analyze(ctx context.Context, client *http.Client, policerURL string, policerToken string, data []byte) error {
 
 	sreq := api.NewPoliceRequest()
 	sreq.Type = api.PoliceRequestTypeInput
@@ -37,19 +37,14 @@ func analyze(ctx context.Context, client *http.Client, apexURL string, apexToken
 		return fmt.Errorf("unable to encode scan request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		fmt.Sprintf("%s/_acuvity/police", apexURL),
-		bytes.NewBuffer(body),
-	)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, policerURL, bytes.NewBuffer(body))
 	if err != nil {
 		return fmt.Errorf("unable to create new http request: %w", err)
 	}
 
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", apexToken))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", policerToken))
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -63,7 +58,7 @@ func analyze(ctx context.Context, client *http.Client, apexURL string, apexToken
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("invalid response from apex `%s`: %s", string(rbody), resp.Status)
+		return fmt.Errorf("invalid response from policer `%s`: %s", string(rbody), resp.Status)
 	}
 
 	sresp := api.NewScanResponse()
@@ -81,9 +76,14 @@ func analyze(ctx context.Context, client *http.Client, apexURL string, apexToken
 func makeMCPError(data []byte, err error) []byte {
 
 	s := struct {
-		ID int `json:"id"`
+		ID any `json:"id"`
 	}{}
 	_ = elemental.Decode(elemental.EncodingTypeJSON, data, &s)
 
-	return fmt.Appendf([]byte{}, `{"jsonrpc":"2.0","id":%d,"error":{"code":451,"message":"%s"}}`, s.ID, err.Error())
+	switch s.ID.(type) {
+	case string:
+		return fmt.Appendf([]byte{}, `{"jsonrpc":"2.0","id":"%s","error":{"code":451,"message":"%s"}}`, s.ID, err.Error())
+	default:
+		return fmt.Appendf([]byte{}, `{"jsonrpc":"2.0","id":%d,"error":{"code":451,"message":"%s"}}`, s.ID, err.Error())
+	}
 }

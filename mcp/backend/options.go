@@ -5,9 +5,9 @@ import (
 )
 
 type wsCfg struct {
-	apexURL       string
-	apexToken     string
-	apexTLSConfig *tls.Config
+	policerURL       string
+	policerToken     string
+	policerTLSConfig *tls.Config
 }
 
 func newWSCfg() wsCfg {
@@ -17,17 +17,18 @@ func newWSCfg() wsCfg {
 // OptWS are options that can be given to NewStdio().
 type OptWS func(*wsCfg)
 
-// OptWSApexURL sets the apex URL to forward the traffic to.
-func OptWSApexURL(url string, token string) OptWS {
+// OptWSPolicerURL sets the Policer URL to forward the traffic to.
+func OptWSPolicerURL(url string, token string) OptWS {
 	return func(cfg *wsCfg) {
-		cfg.apexURL = url
-		cfg.apexToken = token
+		cfg.policerURL = url
+		cfg.policerToken = token
 	}
 }
 
-// OptWSApexURL sets the apex URL to forward the traffic to.
-func OptWSApexTLSConfig(tlsConfig *tls.Config) OptWS {
+// OptWSPolicerTLSConfig sets the *tls.Config to use to
+// contact the Policer.
+func OptWSPolicerTLSConfig(tlsConfig *tls.Config) OptWS {
 	return func(cfg *wsCfg) {
-		cfg.apexTLSConfig = tlsConfig
+		cfg.policerTLSConfig = tlsConfig
 	}
 }
