@@ -179,6 +179,7 @@ Example:
 
 Minibridge is still missing the following features:
 
+- [ ] Unit tests
 - [ ] Transport user information over the websocket channel
 - [ ] Support for user extraction to pass to the policer
 - [ ] Optimize communications between front/back in aio mode
