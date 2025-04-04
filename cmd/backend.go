@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"go.acuvity.ai/minibridge/mcp"
 	"go.acuvity.ai/minibridge/mcp/backend"
+	"go.acuvity.ai/minibridge/mcp/client"
 )
 
 var fBackend = pflag.NewFlagSet("backend", pflag.ExitOnError)
@@ -52,7 +52,7 @@ var Backend = &cobra.Command{
 
 		startHelperServers(cmd.Context())
 
-		mcpServer := mcp.Server{Command: args[0], Args: args[1:]}
+		mcpServer := client.MCPServer{Command: args[0], Args: args[1:]}
 
 		slog.Info("Backend configured",
 			"mode", "ws",

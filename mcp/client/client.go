@@ -1,4 +1,4 @@
-package mcp
+package client
 
 import (
 	"bufio"
@@ -10,20 +10,15 @@ import (
 	"os/exec"
 )
 
-type StdioClient struct {
+type stdioClient struct {
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
 	stderr io.ReadCloser
 }
 
-type Server struct {
-	Command string
-	Args    []string
-	Env     []string
-}
-
-func NewStdioMCPClient(srv Server) (*StdioClient, error) {
+// NewStdio returns a Client communicating through stdio.
+func NewStdio(srv MCPServer) (Client, error) {
 
 	cmd := exec.Command(srv.Command, srv.Args...)
 	cmd.Env = append(os.Environ(), srv.Env...)
@@ -43,7 +38,7 @@ func NewStdioMCPClient(srv Server) (*StdioClient, error) {
 		return nil, fmt.Errorf("unable to create stderr pipe: %w", err)
 	}
 
-	client := &StdioClient{
+	client := &stdioClient{
 		cmd:    cmd,
 		stdin:  stdin,
 		stderr: stderr,
@@ -57,7 +52,7 @@ func NewStdioMCPClient(srv Server) (*StdioClient, error) {
 	return client, nil
 }
 
-func (c *StdioClient) Start(ctx context.Context) (in chan []byte, out chan []byte, err chan []byte) {
+func (c *stdioClient) Start(ctx context.Context) (in chan []byte, out chan []byte, err chan []byte) {
 
 	in = make(chan []byte, 1024)
 	go c.readRequests(ctx, in)
@@ -71,7 +66,7 @@ func (c *StdioClient) Start(ctx context.Context) (in chan []byte, out chan []byt
 	return in, out, err
 }
 
-func (c *StdioClient) readRequests(ctx context.Context, ch chan []byte) {
+func (c *stdioClient) readRequests(ctx context.Context, ch chan []byte) {
 
 	for {
 
@@ -89,7 +84,7 @@ func (c *StdioClient) readRequests(ctx context.Context, ch chan []byte) {
 	}
 }
 
-func (c *StdioClient) readResponses(ctx context.Context, ch chan []byte) {
+func (c *stdioClient) readResponses(ctx context.Context, ch chan []byte) {
 
 	stdout := bufio.NewReader(c.stdout)
 
@@ -119,7 +114,7 @@ func (c *StdioClient) readResponses(ctx context.Context, ch chan []byte) {
 	}
 }
 
-func (c *StdioClient) readErrors(ctx context.Context, ch chan []byte) {
+func (c *stdioClient) readErrors(ctx context.Context, ch chan []byte) {
 
 	stderr := bufio.NewReader(c.stderr)
 

@@ -11,14 +11,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"go.acuvity.ai/minibridge/mcp"
+	"go.acuvity.ai/minibridge/mcp/client"
 	"go.acuvity.ai/wsc"
 )
 
 type wsBackend struct {
 	cfg           wsCfg
-	clients       chan *mcp.StdioClient
-	mcpServer     mcp.Server
+	clients       chan client.Client
+	mcpServer     client.MCPServer
 	server        *http.Server
 	policerClient *http.Client
 }
@@ -26,7 +26,7 @@ type wsBackend struct {
 // NewWebSocket retrurns a new backend.Backend exposing a Websocket to communicate
 // with the given mcp.Server. It will use the given *tls.Config for everything TLS.
 // It tls.Config is nil, the server will run as plain HTTP.
-func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer mcp.Server, opts ...OptWS) Backend {
+func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServer, opts ...OptWS) Backend {
 
 	cfg := newWSCfg()
 	for _, o := range opts {
@@ -35,7 +35,7 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer mcp.Server, op
 
 	p := &wsBackend{
 		mcpServer: mcpServer,
-		clients:   make(chan *mcp.StdioClient),
+		clients:   make(chan client.Client),
 		cfg:       cfg,
 	}
 
@@ -86,7 +86,7 @@ func (p *wsBackend) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			default:
-				client, err := mcp.NewStdioMCPClient(p.mcpServer)
+				client, err := client.NewStdio(p.mcpServer)
 				if err != nil {
 					slog.Error("Unable to spawn MCP Server", err)
 					continue

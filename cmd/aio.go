@@ -12,8 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"go.acuvity.ai/minibridge/mcp"
 	"go.acuvity.ai/minibridge/mcp/backend"
+	"go.acuvity.ai/minibridge/mcp/client"
 	"go.acuvity.ai/minibridge/mcp/frontend"
 	"go.acuvity.ai/tg/tglib"
 	"golang.org/x/sync/errgroup"
@@ -85,7 +85,7 @@ var AIO = &cobra.Command{
 
 		eg.Go(func() error {
 
-			mcpServer := mcp.Server{Command: args[0], Args: args[1:]}
+			mcpServer := client.MCPServer{Command: args[0], Args: args[1:]}
 			slog.Info("Starting backend",
 				"command", mcpServer.Command,
 				"args", mcpServer.Args,
