@@ -1,30 +1,30 @@
 # minibridge
 
-Minibridge is a bridge between MCP servers and the rest of the world. It
-operates as a backend <-> frontend connector between Agents and MCP Servers. It
-allows to expose MCP server securely over internet and allows seemless
-integration to the Acuvity Plaform.
+Minibridge serves as a bridge between MCP servers and the outside world. It
+functions as a backend-to-frontend connector, facilitating communication between
+Agents and MCP servers. It securely exposes MCP servers to the internet and
+optionally enables seamless integration with the Acuvity Platform.
 
-Minibridge does not need to understand the core MCP procotol as it only work
-with data stream. This ensures forward compatibility with future changes on the
-MCP procotol.
+Minibridge does not need to interpret the core MCP protocol, as it only handles
+data streams. This design ensures forward compatibility with future changes to
+the MCP protocol.
 
-As of now, Minibridge should work with any compliant MCP server using protocol
-version 2024-11-05. Support for 2025-03-26 is on the way.
+Currently, Minibridge is compatible with any compliant MCP server using protocol
+version 2024-11-05. Support for version 2025-03-26 is in progress.
 
-> NOTE: minibridge is still under active development.
+> Note: Minibridge is still under active development.
 
 ## All In One
 
-Minibridge can operate as a single gateway to be placed in front of a stdio MCP
-Server.
+Minibridge can act as a single gateway positioned in front of a standard
+stdio-based MCP server.
 
-start everything as a single process:
+To start everything as a single process, run:
 
-minibridge aio --listen :8000 -- npx -y @modelcontextprotocol/server-filesystem /tmp
+    minibridge aio --listen :8000 -- npx -y @modelcontextprotocol/server-filesystem /tmp
 
-This will start both frontend and backend in a single process. This is useful in
-some ocasions.
+This command launches both the frontend and backend within a single process,
+which can be useful in certain scenarios.
 
 The flow will look like the following:
 
@@ -32,11 +32,11 @@ The flow will look like the following:
 
 ## Backend
 
-Starting the backend will run an MCP server and expose its API over a
-websocket-based API. It allows to configure TLS with or without client
-certificates.
+Starting the backend launches an MCP server and exposes its API over a
+WebSocket-based interface. TLS can be configured, with or without client
+certificates, depending on your security requirements.
 
-To start a a filesystem MCP server:
+For example, to start a filesystem-based MCP server:
 
     minibridge backend -- npx -y @modelcontextprotocol/server-filesystem /tmp
 
@@ -44,7 +44,7 @@ You can now connect directly using a websocket client:
 
     wscat --connect ws://127.0.0.1:8080/ws
 
-> NOTE: use wss scheme if you have started minibridge backend with TLS.
+> NOTE: use the `wss` scheme if you have started minibridge backend with TLS.
 
 > NOTE: Today, minibridge backend only supports MCP server over stdio.
 
@@ -54,11 +54,11 @@ The flow will look like the following:
 
 ## Frontend
 
-While websockets remove a lot of issue plain POST+SSE brings, it is not part of
-the MCP protocol yet. To be backward compatible with existing agents, frontend
-can expose a local POST+SSE, HTTP+STREAM (soon) or plain STDIO to your agent,
-and will deal with forwarding the data accordingly to the minibridge backend,
-using websockets and HTTPS transparently.
+While WebSockets address many of the limitations of plain POST+SSE, they are not
+yet part of the official MCP protocol. To maintain backward compatibility with
+existing agents, the frontend can expose a local interface using POST+SSE,
+HTTP+STREAM (coming soon), or plain STDIO. It will then transparently forward
+the data to the Minibridge backend over WebSockets and HTTPS.
 
 ### Stdio Frontend
 
@@ -66,9 +66,9 @@ To start an stdio frontend:
 
     minibridge frontend --backend wss://127.0.0.1:8000/ws
 
-You can then send request to stdin and read responses to stdout. The frontend
-will maintain a single WS connection to the backend, that will reconnect in case
-of failures.
+You can then send requests via stdin and read responses from stdout. The
+frontend maintains a single WebSocket connection to the backend and will
+automatically reconnect in case of failures.
 
 The flow will look like the following:
 
@@ -80,10 +80,10 @@ To start an SSE frontend:
 
     minibridge frontend --listen :8081 --backend wss://127.0.0.1:8000/ws
 
-In this mode, a new websocket connection will be created to the backend for each
-new connection received in the /sse endpoint. This maintains sessions. This
-websocket wil not try to reconnect in that mode and active streams will be
-shutdown in case of network failure.
+In this mode, a new WebSocket connection is established with the backend for
+each incoming connection to the /sse endpoint. This preserves session state.
+However, the WebSocket will not attempt to reconnect in this mode, and any
+active streams will be terminated in the event of a network failure.
 
 The flow will look like the following:
 
@@ -91,13 +91,38 @@ The flow will look like the following:
 
 ## Acuvity Integration
 
-While minibridge by itself already brings serious features like strong client
-authentication, websocket by itself, it can be used with the Acuvity platform.
-With such an integration the following features will be available:
+While Minibridge already offers advanced features such as strong client
+authentication and native WebSocket support, it can be further enhanced through
+integration with the Acuvity Platform. This integration unlocks a range of
+additional capabilities, including:
 
-* bearer authn
-* rego based authz
-* analysis and logging of inputs
-* tracing of the requests
-* redactions of sensitive data
-* much more
+* User authentication
+* Role-based user authorization
+* Input analysis and logging
+* Full request tracing
+* And more advanced policy-based controls
+
+To enable integration with Acuvity, you must first have an Acuvity account. If
+you don’t have one yet, you can [register here](https://console.acuvity.ai/signup).
+
+Next, generate an App Token using the following command:
+
+    acuctl api create apptoken --with.name my-mcp-server -n yourorg/apps -o json
+
+You can then start Minibridge, using either the aio or backend subcommand, with
+the following arguments:
+
+    minibridge aio --apex-url id.acuvity.ai --apex-token $APPTOKEN
+
+Once integrated, any command received by the backend is first forwarded to Apex
+(Acuvity’s policy engine) for analysis. Apex evaluates the request against the
+configured security and access policies.
+
+If the request is denied, Minibridge will not forward it to the MCP server.
+Instead, it will return a descriptive MCP error to the client, indicating why
+the request was blocked.
+
+Example:
+
+    $ mcptools tools http://127.0.0.1:8000
+    error: RPC error 451: request blocked: ForbiddenUser: I'm afraid you cannot do this, Dave
