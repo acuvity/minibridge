@@ -107,12 +107,11 @@ flowchart LR
     mb2 -- stdio --> mcpserver
 ```
 
-## Acuvity Integration
+## Policer Integration
 
 While Minibridge already offers advanced features such as strong client
 authentication and native WebSocket support, it can be further enhanced through
-integration with the Acuvity Platform. This integration unlocks a range of
-additional capabilities, including:
+integration with a Policer. A Policer is responsible for:
 
 * User authentication
 * Role-based user authorization
@@ -120,24 +119,56 @@ additional capabilities, including:
 * Full request tracing
 * And more advanced policy-based controls
 
-To enable integration with Acuvity, you must first have an Acuvity account. If
-you don’t have one yet, you can [register here](https://console.acuvity.ai/signup).
-
-Next, generate an App Token using the following command:
-
-    acuctl api create apptoken --with.name my-mcp-server -n yourorg/apps -o json
+The Policer, if set, will be called and passed various information so it can
+make a decision on what to do with the request, based on the user who initiated
+the request and the content of the request.
 
 You can then start Minibridge, using either the aio or backend subcommand, with
 the following arguments:
 
     minibridge aio --policer-url https://policer.acme.com/police --policer-token $APPTOKEN
 
-Once integrated, any command received by the backend is first forwarded to a
-Policer for authentication and/or analysis.
+Once integrated, any command from the user or response from the MCP Server
+received by the backend is first passed to the Policer for authentication and/or
+analysis.
 
-If the request is denied, Minibridge will not forward it to the MCP server.
-Instead, it will return a descriptive MCP error to the client, indicating why
-the request was blocked.
+The Policer receives a `POST` request at the `--policer-url` endpoint in the
+following format:
+
+```json
+{
+  "messages": ["{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}"],
+  "type":"Input"
+}
+```
+
+> NOTE: for a response from the MCP Server, the `type` will be set to `Output`.
+
+The Policer must respond with an HTTP status code `200 OK` if the request passes
+the policy checks. Any other status code will be treated as a failure, and the
+request will be blocked.
+
+For a policy decision that permits the request:
+
+```json
+{
+  "decision": "Allow"
+}
+```
+
+For a policy result that denies the request:
+
+```json
+{
+  "decision": "Deny",
+  "reasons": ["You are not allowed to use this tool"]
+}
+```
+
+
+If the request is denied (or the Policer does not return `200 OK`), Minibridge
+will not forward it to the MCP server. Instead, it will return a descriptive MCP
+error to the client, indicating why the request was blocked.
 
 Example:
 
