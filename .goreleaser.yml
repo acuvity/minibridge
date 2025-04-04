@@ -1,5 +1,6 @@
+version: 2
 snapshot:
-  name_template: "v{{ .Tag }}-next"
+  version_template: "v{{ .Tag }}-next"
 changelog:
   sort: asc
   filters:
@@ -21,7 +22,7 @@ builds:
 
 archives:
   - id: minibridge
-    format: binary
+    formats: ['binary']
     builds:
     - minibridge
 
