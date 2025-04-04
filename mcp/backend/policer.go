@@ -15,7 +15,7 @@ import (
 
 var ErrBlocked = errors.New("request blocked")
 
-func analyze(ctx context.Context, client *http.Client, policerURL string, policerToken string, data []byte) error {
+func police(ctx context.Context, client *http.Client, policerURL string, policerToken string, data []byte) error {
 
 	sreq := api.NewPoliceRequest()
 	sreq.Type = api.PoliceRequestTypeInput

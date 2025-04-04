@@ -148,7 +148,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 
 			if p.cfg.policerURL != "" {
-				if err := analyze(
+				if err := police(
 					req.Context(),
 					p.policerClient,
 					p.cfg.policerURL,
