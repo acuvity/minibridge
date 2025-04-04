@@ -13,7 +13,6 @@ builds:
     binary: minibridge
     goos:
     - linux
-    - freebsd
     - darwin
     goarch:
     - amd64
