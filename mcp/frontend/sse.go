@@ -167,7 +167,10 @@ func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Header().Add("Keep-Alive", "timeout=5")
 		w.Header().Add("Transfer-Encoding", "chunked")
 		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte("Accepted"))
+
+		// this is against spec. however it seems to
+		// be needed by some client..
+		_, _ = w.Write([]byte("Accepted"))
 
 		ws.Write(data)
 
