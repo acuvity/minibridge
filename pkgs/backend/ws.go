@@ -173,8 +173,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			session.Write(data)
 
 		case data := <-errCh:
-			_ = data
-			// slog.Debug("MCP Server log", "log", string(data))
+			slog.Error("Command", "log", string(data))
 
 		case <-session.Done():
 			slog.Debug("Websocket has closed")
