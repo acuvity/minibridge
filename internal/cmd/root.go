@@ -16,6 +16,7 @@ func init() {
 	initSharedFlagSet()
 
 	Root.PersistentFlags().String("log-level", "info", "Set the log level")
+	Root.PersistentFlags().String("log-format", "console", "Set the log format")
 }
 
 var Root = &cobra.Command{
@@ -36,7 +37,7 @@ var Root = &cobra.Command{
 
 		bootstrap.ConfigureLogger("minibridge", conf.LoggingConf{
 			LogLevel:  viper.GetString("log-level"),
-			LogFormat: "console",
+			LogFormat: viper.GetString("log-format"),
 		})
 
 		return nil
