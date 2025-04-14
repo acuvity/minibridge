@@ -34,11 +34,22 @@ func OptSSEMessageEndpoint(ep string) OptSSE {
 }
 
 type stdioCfg struct {
+	retry bool
 }
 
 func newStdioCfg() stdioCfg {
-	return stdioCfg{}
+	return stdioCfg{
+		retry: true,
+	}
 }
 
 // OptStdio are options that can be given to NewStdio().
 type OptStdio func(*stdioCfg)
+
+// OptStdioRetry allows to control if the Stdio frontend
+// should retry or not after a wbesocket connection failure.
+func OptStdioRetry(retry bool) OptStdio {
+	return func(cfg *stdioCfg) {
+		cfg.retry = retry
+	}
+}

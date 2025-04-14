@@ -1,10 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"go.acuvity.ai/minibridge/internal/cmd"
 )
@@ -20,7 +19,7 @@ func main() {
 	)
 
 	if err := cmd.Root.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %s\n", color.RedString("error"), err)
+		slog.Error("Minibridge exited with error", err)
 		os.Exit(1)
 	}
 }

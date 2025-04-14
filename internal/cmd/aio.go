@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -46,6 +47,11 @@ var AIO = &cobra.Command{
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
+
+		cmd.SetContext(ctx)
+
 		listen := viper.GetString("listen")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
@@ -71,7 +77,7 @@ var AIO = &cobra.Command{
 
 		frontendTLSConfig.RootCAs = trustPool
 
-		startHelperServers(cmd.Context())
+		startHelperServers(ctx)
 
 		iport, err := randomFreePort()
 		if err != nil {
@@ -84,7 +90,10 @@ var AIO = &cobra.Command{
 
 		eg.Go(func() error {
 
+			defer cancel()
+
 			mcpServer := client.MCPServer{Command: args[0], Args: args[1:]}
+
 			slog.Info("Starting backend",
 				"command", mcpServer.Command,
 				"args", mcpServer.Args,
@@ -94,10 +103,13 @@ var AIO = &cobra.Command{
 			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
 				backend.OptWSPolicer(policer),
 			)
-			return proxy.Start(cmd.Context())
+
+			return proxy.Start(ctx)
 		})
 
 		eg.Go(func() error {
+
+			defer cancel()
 
 			var proxy frontend.Frontend
 
@@ -120,10 +132,12 @@ var AIO = &cobra.Command{
 					"mode", "stdio",
 				)
 
-				proxy = frontend.NewStdio(backendURL, frontendTLSConfig)
+				proxy = frontend.NewStdio(backendURL, frontendTLSConfig,
+					frontend.OptStdioRetry(false),
+				)
 			}
 
-			return proxy.Start(cmd.Context())
+			return proxy.Start(ctx)
 		})
 
 		return eg.Wait()

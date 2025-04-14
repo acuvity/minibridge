@@ -78,31 +78,6 @@ func (p *sseFrontend) Start(ctx context.Context) error {
 	return p.server.Shutdown(stopCtx)
 }
 
-func (p *sseFrontend) connect(ctx context.Context) (wsc.Websocket, error) {
-
-	session, resp, err := wsc.Connect(
-		ctx,
-		p.backendURL,
-		wsc.Config{
-			WriteChanSize: 64,
-			ReadChanSize:  16,
-			TLSConfig:     p.tlsConfig,
-		},
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to the websocket '%s': %w", p.backendURL, err)
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusSwitchingProtocols {
-		return nil, fmt.Errorf("invalid response from other end of the tunnel (must be 101): %s", resp.Status)
-	}
-
-	return session, nil
-}
-
 func (p *sseFrontend) registerSession(sid string, ws wsc.Websocket) {
 	p.Lock()
 	p.sessions[sid] = ws
@@ -186,7 +161,7 @@ func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		log.Debug("Handling new SSE", "client", req.RemoteAddr)
 
-		ws, err := p.connect(req.Context())
+		ws, err := connectWS(req.Context(), p.backendURL, p.tlsConfig)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Unable to connect to minibridge end: %s", err), http.StatusInternalServerError)
 			return

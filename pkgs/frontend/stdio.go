@@ -8,11 +8,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
-
-	"go.acuvity.ai/wsc"
 )
 
 type stdioFrontend struct {
@@ -47,38 +44,15 @@ func NewStdio(backend string, tlsConfig *tls.Config, opts ...OptStdio) Frontend 
 // the server returns an error.
 func (p *stdioFrontend) Start(ctx context.Context) error {
 
-	go p.wspump(ctx)
-	go p.stdiopump(ctx)
+	subctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	return nil
+	go p.stdiopump(subctx)
+
+	return p.wspump(subctx)
 }
 
-func (p *stdioFrontend) wspump(ctx context.Context) {
-
-	connect := func(ctx context.Context) (wsc.Websocket, error) {
-
-		session, resp, err := wsc.Connect(
-			ctx,
-			p.backendURL,
-			wsc.Config{
-				WriteChanSize: 64,
-				ReadChanSize:  16,
-				TLSConfig:     p.tlsConfig,
-			},
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("unable to connect to the websocket '%s': %w", p.backendURL, err)
-		}
-
-		defer func() { _ = resp.Body.Close() }()
-
-		if resp.StatusCode != http.StatusSwitchingProtocols {
-			return nil, fmt.Errorf("invalid response from other end of the tunnel (must be 101): %s", resp.Status)
-		}
-
-		return session, nil
-	}
+func (p *stdioFrontend) wspump(ctx context.Context) error {
 
 	var failures int
 
@@ -87,22 +61,30 @@ func (p *stdioFrontend) wspump(ctx context.Context) {
 		select {
 
 		case <-ctx.Done():
-			return
+			return nil
 
 		default:
-			session, err := connect(ctx)
+			session, err := connectWS(ctx, p.backendURL, p.tlsConfig)
 			if err != nil {
-				if failures == 1 {
-					slog.Error("Unable to connect. Will retry", err)
+
+				if !p.cfg.retry {
+					return err
 				}
+
+				if failures == 1 {
+					slog.Error("Retrying...", err)
+				}
+
 				failures++
 				time.Sleep(2 * time.Second)
+
 				continue
 			}
 
 			if failures > 0 {
 				slog.Info("Connection restored", "attempts", failures)
 			}
+
 			failures = 0
 
 		L:
@@ -120,13 +102,16 @@ func (p *stdioFrontend) wspump(ctx context.Context) {
 					failures++
 					slog.Error("Error from webscoket", err)
 
-				case <-session.Done():
+				case err := <-session.Done():
 					failures++
+					if !p.cfg.retry {
+						return err
+					}
 					break L
 
 				case <-ctx.Done():
 					session.Close(1000)
-					return
+					return nil
 				}
 			}
 		}
@@ -143,6 +128,7 @@ func (p *stdioFrontend) stdiopump(ctx context.Context) {
 		default:
 
 			data, err := stdin.ReadBytes('\n')
+
 			if err != nil {
 				if err != io.EOF {
 					slog.Error("Unable to read data from stdin", "err", err)

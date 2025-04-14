@@ -19,7 +19,6 @@ import (
 
 type wsBackend struct {
 	cfg       wsCfg
-	clients   chan client.Client
 	mcpServer client.MCPServer
 	server    *http.Server
 }
@@ -36,7 +35,6 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServ
 
 	p := &wsBackend{
 		mcpServer: mcpServer,
-		clients:   make(chan client.Client),
 		cfg:       cfg,
 	}
 
@@ -73,24 +71,6 @@ func (p *wsBackend) Start(ctx context.Context) error {
 		}
 	}()
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				client, err := client.NewStdio(p.mcpServer)
-				if err != nil {
-					slog.Error("Unable to spawn MCP Server", err)
-					continue
-				}
-
-				p.clients <- client
-
-			}
-		}
-	}()
-
 	select {
 	case <-ctx.Done():
 	case err := <-errCh:
@@ -107,6 +87,19 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if req.Method != http.MethodGet || req.URL.Path != "/ws" {
 		http.Error(w, "only supports GET /ws", http.StatusBadRequest)
+		return
+	}
+
+	stream, err := client.NewStdio(p.mcpServer).Start(req.Context())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	select {
+	default:
+	case err := <-stream.Exit:
+		http.Error(w, fmt.Sprintf("mcp server has exited: %s", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -128,8 +121,6 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	defer session.Close(1001)
 
-	inCh, outCh, errCh := (<-p.clients).Start(req.Context())
-
 	for {
 
 		select {
@@ -145,7 +136,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			if pol := p.cfg.policer; pol != nil {
 				if err := pol.Police(req.Context(), api.PoliceRequestTypeInput, data); err != nil {
 					if errors.Is(err, policer.ErrBlocked) {
-						outCh <- makeMCPError(data, err)
+						stream.Stdout <- makeMCPError(data, err)
 						continue
 					}
 					slog.Error("Unable to run analysis", err)
@@ -153,16 +144,16 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				}
 			}
 
-			inCh <- data
+			stream.Stdin <- data
 
-		case data := <-outCh:
+		case data := <-stream.Stdout:
 
 			slog.Debug("Received data from MCP Server", "msg", string(data))
 
 			if pol := p.cfg.policer; pol != nil {
 				if err := pol.Police(req.Context(), api.PoliceRequestTypeOutput, data); err != nil {
 					if errors.Is(err, policer.ErrBlocked) {
-						outCh <- makeMCPError(data, err)
+						stream.Stdout <- makeMCPError(data, err)
 						continue
 					}
 					slog.Error("Unable to run analysis", err)
@@ -172,8 +163,12 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			session.Write(data)
 
-		case data := <-errCh:
-			slog.Error("Command", "log", string(data))
+		case data := <-stream.Stderr:
+			slog.Debug("Command", "log", string(data))
+
+		case err := <-stream.Exit:
+			slog.Error("MCP Server exited", err)
+			return
 
 		case <-session.Done():
 			slog.Debug("Websocket has closed")
