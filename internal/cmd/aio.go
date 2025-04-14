@@ -128,7 +128,7 @@ var AIO = &cobra.Command{
 					"messages", messageEndpoint,
 				)
 
-				proxy = frontend.NewSSE(listen, backendURL, frontendClientTLSConfig, frontendTLSConfig,
+				proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig, frontendClientTLSConfig,
 					frontend.OptSSEStreamEndpoint(sseEndpoint),
 					frontend.OptSSEMessageEndpoint(messageEndpoint),
 				)
@@ -138,7 +138,7 @@ var AIO = &cobra.Command{
 					"mode", "stdio",
 				)
 
-				proxy = frontend.NewStdio(backendURL, frontendTLSConfig,
+				proxy = frontend.NewStdio(backendURL, frontendClientTLSConfig,
 					frontend.OptStdioRetry(false),
 				)
 			}
