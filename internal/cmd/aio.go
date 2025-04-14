@@ -36,6 +36,7 @@ func init() {
 	AIO.Flags().AddFlagSet(fTLSServer)
 	AIO.Flags().AddFlagSet(fHealth)
 	AIO.Flags().AddFlagSet(fProfiler)
+	AIO.Flags().AddFlagSet(fJWTVerifier)
 }
 
 var AIO = &cobra.Command{
@@ -57,6 +58,12 @@ var AIO = &cobra.Command{
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 		policerURL := viper.GetString("policer-url")
+
+		jwtVConfig := jwtVerifierConfigFromFlags()
+		jwks, err := makeJWKS(cmd.Context(), jwtVConfig)
+		if err != nil {
+			return err
+		}
 
 		backendTLSConfig, trustPool, err := makeTempTLSConfig()
 		if err != nil {
@@ -104,6 +111,7 @@ var AIO = &cobra.Command{
 			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
 				backend.OptWSPolicer(policer),
 				backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
+				backend.OptWSAuth(jwks, jwtVConfig.principalClaim, jwtVConfig.reqIss, jwtVConfig.reqAud),
 			)
 
 			return proxy.Start(ctx)
@@ -133,6 +141,7 @@ var AIO = &cobra.Command{
 				proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig, frontendClientTLSConfig,
 					frontend.OptSSEStreamEndpoint(sseEndpoint),
 					frontend.OptSSEMessageEndpoint(messageEndpoint),
+					frontend.OptSSEAgentTokenPassthrough(true),
 				)
 			} else {
 

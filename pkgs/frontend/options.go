@@ -1,8 +1,10 @@
 package frontend
 
 type sseCfg struct {
-	sseEndpoint      string
-	messagesEndpoint string
+	sseEndpoint           string
+	messagesEndpoint      string
+	agentTokenPassthrough bool
+	agentToken            string
 }
 
 func newSSECfg() sseCfg {
@@ -33,8 +35,26 @@ func OptSSEMessageEndpoint(ep string) OptSSE {
 	}
 }
 
+// OptSSEAgentToken sets the token to send to the minibridge
+// backend in order to authenticate the agent sending a request though
+// the minibridge frontend.
+func OptSSEAgentToken(tokenString string) OptSSE {
+	return func(cfg *sseCfg) {
+		cfg.agentToken = tokenString
+	}
+}
+
+// OptSSEAgentTokenPassthrough decides if the HTTP request Authorization header
+// should be passed as-is to the minibridge backend.
+func OptSSEAgentTokenPassthrough(passthrough bool) OptSSE {
+	return func(cfg *sseCfg) {
+		cfg.agentTokenPassthrough = passthrough
+	}
+}
+
 type stdioCfg struct {
-	retry bool
+	retry      bool
+	agentToken string
 }
 
 func newStdioCfg() stdioCfg {
@@ -51,5 +71,13 @@ type OptStdio func(*stdioCfg)
 func OptStdioRetry(retry bool) OptStdio {
 	return func(cfg *stdioCfg) {
 		cfg.retry = retry
+	}
+}
+
+// OptStdioAgentToken sets the token to send to the minibridge
+// backend in order to authenticate the agent using the standard input.
+func OptStioAgentToken(tokenString string) OptStdio {
+	return func(cfg *stdioCfg) {
+		cfg.agentToken = tokenString
 	}
 }

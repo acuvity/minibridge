@@ -24,6 +24,7 @@ func init() {
 	Backend.Flags().AddFlagSet(fTLSServer)
 	Backend.Flags().AddFlagSet(fHealth)
 	Backend.Flags().AddFlagSet(fProfiler)
+	Backend.Flags().AddFlagSet(fJWTVerifier)
 }
 
 // Backend is the cobra command to run the server.
@@ -39,6 +40,12 @@ var Backend = &cobra.Command{
 
 		listen := viper.GetString("listen")
 		policerURL := viper.GetString("policer-url")
+
+		jwtVerifierConfig := jwtVerifierConfigFromFlags()
+		jwks, err := makeJWKS(cmd.Context(), jwtVerifierConfig)
+		if err != nil {
+			return err
+		}
 
 		backendTLSConfig, err := tlsConfigFromFlags(fTLSServer)
 		if err != nil {
@@ -66,6 +73,7 @@ var Backend = &cobra.Command{
 		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,
 			backend.OptWSPolicer(policer),
 			backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
+			backend.OptWSAuth(jwks, jwtVerifierConfig.principalClaim, jwtVerifierConfig.reqIss, jwtVerifierConfig.reqAud),
 		)
 
 		return proxy.Start(cmd.Context())

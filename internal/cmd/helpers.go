@@ -6,9 +6,11 @@ import (
 	"crypto/x509"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/spf13/pflag"
+	"go.acuvity.ai/a3s/pkgs/token"
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/tg/tglib"
@@ -92,6 +94,48 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
+type jwtVerifierConfig struct {
+	jwksURL        string
+	jwksCAPath     string
+	jwksSkipVerify bool
+	jwtCertPath    string
+	reqIss         string
+	reqAud         string
+	principalClaim string
+}
+
+func jwtVerifierConfigFromFlags() jwtVerifierConfig {
+
+	cfg := jwtVerifierConfig{}
+
+	cfg.jwksURL, _ = fJWTVerifier.GetString("jwks-url")
+	cfg.jwksCAPath, _ = fJWTVerifier.GetString("jwks-ca")
+	cfg.jwksSkipVerify, _ = fJWTVerifier.GetBool("jwks-insecure-skip-verify")
+	cfg.jwtCertPath, _ = fJWTVerifier.GetString("jwt-cert")
+	cfg.reqIss, _ = fJWTVerifier.GetString("jwt-required-issuer")
+	cfg.reqAud, _ = fJWTVerifier.GetString("jwt-required-audience")
+	cfg.principalClaim, _ = fJWTVerifier.GetString("jwt-principal-claim")
+
+	if cfg.jwksURL != "" || cfg.jwtCertPath != "" {
+		slog.Info("JWT verifier configured",
+			"jwks-url", cfg.jwksURL,
+			"jwks-custom-ca", cfg.jwksCAPath != "",
+			"cert", cfg.jwtCertPath,
+			"req-iss", cfg.reqIss,
+			"req-aud", cfg.reqAud,
+			"principal-claim", cfg.principalClaim,
+		)
+	} else {
+		slog.Info("No JWT verifier configured")
+	}
+
+	if cfg.jwksSkipVerify {
+		slog.Warn("Security: JWT verifier will trust any jwks server ca. This is VERY insecure.")
+	}
+
+	return cfg
+}
+
 func startHelperServers(ctx context.Context) bahamut.MetricsManager { // nolint: unparam
 
 	healthEnabled, _ := fHealth.GetBool("health-enable")
@@ -155,4 +199,67 @@ func makePolicer() (policer.Policer, error) {
 	}
 
 	return policer.New(policerURL, policerToken, tlsConfig), nil
+}
+
+func makeJWKS(ctx context.Context, cfg jwtVerifierConfig) (jwks *token.JWKS, err error) {
+
+	if cfg.jwtCertPath == "" && cfg.jwksURL == "" {
+		return nil, nil
+	}
+
+	switch {
+
+	case cfg.jwksURL != "":
+
+		var transport http.RoundTripper
+
+		if cfg.jwksSkipVerify {
+
+			slog.Warn("JWKS TLS Certificate verification disabled. This is highly insecure.")
+
+			transport = &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			}
+
+		} else if cfg.jwksCAPath != "" {
+
+			caBytes, err := os.ReadFile(cfg.jwksCAPath)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load jwks CA from '%s': %w", cfg.jwksCAPath, err)
+			}
+
+			pool := x509.NewCertPool()
+			if !pool.AppendCertsFromPEM(caBytes) {
+				return nil, fmt.Errorf("unable to append ca to jwks client pool")
+			}
+
+			transport = &http.Transport{
+				TLSClientConfig: &tls.Config{
+					RootCAs: pool,
+				},
+			}
+		}
+
+		if jwks, err = token.NewRemoteJWKS(ctx, &http.Client{Transport: transport}, cfg.jwksURL); err != nil {
+			return nil, fmt.Errorf("unable to load remote jwks from '%s': %w", cfg.jwksURL, err)
+		}
+
+	case cfg.jwtCertPath != "":
+
+		certs, err := tglib.ParseCertificatePEMs(cfg.jwtCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("unable parse jwt certificate from '%s': %w", cfg.jwtCertPath, err)
+		}
+
+		jwks = token.NewJWKS()
+		for _, c := range certs {
+			if err := jwks.Append(c); err != nil {
+				return nil, fmt.Errorf("unable to append certificate '%s' to JWKS: %w", cfg.jwtCertPath, err)
+			}
+		}
+	}
+
+	return jwks, nil
 }

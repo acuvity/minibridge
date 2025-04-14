@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/user"
 	"time"
 )
 
@@ -17,6 +18,8 @@ type stdioFrontend struct {
 	tlsConfig  *tls.Config
 	cfg        stdioCfg
 	wsWrite    chan []byte
+	user       string
+	claims     []string
 }
 
 // NewStdio returns a new *StdioProxy that will connect to the given
@@ -44,6 +47,27 @@ func NewStdio(backend string, tlsConfig *tls.Config, opts ...OptStdio) Frontend 
 // the server returns an error.
 func (p *stdioFrontend) Start(ctx context.Context) error {
 
+	user, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("unable to get current user: %w", err)
+	}
+
+	host, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("unable to get current hostname: %w", err)
+	}
+
+	p.user = fmt.Sprintf("%s@%s", user.Username, host)
+	p.claims = []string{
+		fmt.Sprintf("gid=%s", user.Gid),
+		fmt.Sprintf("uid=%s", user.Uid),
+		fmt.Sprintf("username=%s", user.Username),
+		fmt.Sprintf("hostname=%s", host),
+		fmt.Sprintf("minibridge=stdio"),
+	}
+
+	slog.Debug("Local machine user set", "user", p.user, "claims", p.claims)
+
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -64,7 +88,7 @@ func (p *stdioFrontend) wspump(ctx context.Context) error {
 			return nil
 
 		default:
-			session, err := connectWS(ctx, p.backendURL, p.tlsConfig)
+			session, err := connectWS(ctx, p.backendURL, p.tlsConfig, p.cfg.agentToken, nil)
 			if err != nil {
 
 				if !p.cfg.retry {
@@ -96,7 +120,9 @@ func (p *stdioFrontend) wspump(ctx context.Context) error {
 					session.Write(data)
 
 				case data := <-session.Read():
-					fmt.Println(string(data))
+					if len(data) > 0 {
+						fmt.Println(string(data))
+					}
 
 				case err := <-session.Error():
 					failures++

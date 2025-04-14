@@ -36,20 +36,18 @@ func New(endpoint string, token string, tlsConfig *tls.Config) Policer {
 	}
 }
 
-func (p *policer) Police(ctx context.Context, rtype api.PoliceRequestTypeValue, data []byte) error {
+func (p *policer) Police(ctx context.Context, rtype api.PoliceRequestTypeValue, data []byte, user User) error {
 
 	sreq := api.NewPoliceRequest()
 	sreq.Type = rtype
 	sreq.Messages = []string{strings.TrimSpace(string(data))}
 
-	// TODO: add a way to let minibridge run the
-	// extraction to retrieve the name/claims from the
-	// request. This requires https://github.com/acuvity/acuvity/pull/1923
-	//
-	// sreq.User = &api.PoliceExternalUser{
-	// 	Name:   "joe",
-	// 	Claims: []string{"@org=acuvity.ai", "@scope=apps"},
-	// }
+	if user.Name != "" || len(user.Claims) > 0 {
+		sreq.User = &api.PoliceExternalUser{
+			Name:   user.Name,
+			Claims: user.Claims,
+		}
+	}
 
 	body, err := elemental.Encode(elemental.EncodingTypeJSON, sreq)
 	if err != nil {

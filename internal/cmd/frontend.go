@@ -19,6 +19,8 @@ func init() {
 	fFrontend.String("backend", "", "Address of the minibridge backend")
 	fFrontend.String("endpoint-messages", "/message", "When using HTTP, sets the endpoint to post messages")
 	fFrontend.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
+	fFrontend.String("agent-token", "", "The user token to pass inline to the minibridge backend to identify the agent that will be passed to the policer. You must use sse server by setting --listen and configure tls for communications with minibridghe backend")
+	fFrontend.Bool("agent-token-passthrough", false, "If set, the HTTP Authorization header of the incoming agent request will be forwarded as-is to the minibridge backend for agent identification")
 
 	Frontend.Flags().AddFlagSet(fFrontend)
 	Frontend.Flags().AddFlagSet(fTLSClient)
@@ -41,6 +43,15 @@ var Frontend = &cobra.Command{
 		backendURL := viper.GetString("backend")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
+		agentToken := viper.GetString("agent-token")
+		agentTokenPassthrough := viper.GetBool("agent-token-passthrough")
+
+		if agentToken != "" || agentTokenPassthrough {
+			slog.Info("Agent authentication enabled",
+				"token", agentToken != "",
+				"passthrough", agentTokenPassthrough,
+			)
+		}
 
 		backendTLSConfig, err := tlsConfigFromFlags(fTLSClient)
 		if err != nil {
@@ -65,11 +76,15 @@ var Frontend = &cobra.Command{
 				"listen", listen,
 				"sse", sseEndpoint,
 				"messages", messageEndpoint,
+				"agent-token", agentToken != "",
+				"agent-token-passthrough", agentTokenPassthrough,
 			)
 
 			proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig, backendTLSConfig,
 				frontend.OptSSEStreamEndpoint(sseEndpoint),
 				frontend.OptSSEMessageEndpoint(messageEndpoint),
+				frontend.OptSSEAgentToken(agentToken),
+				frontend.OptSSEAgentTokenPassthrough(agentTokenPassthrough),
 			)
 
 		} else {
@@ -79,7 +94,9 @@ var Frontend = &cobra.Command{
 				"backend", backendURL,
 			)
 
-			proxy = frontend.NewStdio(backendURL, backendTLSConfig)
+			proxy = frontend.NewStdio(backendURL, backendTLSConfig,
+				frontend.OptStioAgentToken(agentToken),
+			)
 		}
 
 		return proxy.Start(cmd.Context())

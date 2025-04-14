@@ -109,124 +109,146 @@ func (p *sseFrontend) getSession(sid string) wsc.Websocket {
 	return ws
 }
 
+func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
+
+	if req.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sid := uuid.Must(uuid.NewV6()).String()
+	log := slog.With("sid", sid)
+
+	log.Debug("Handling new SSE", "client", req.RemoteAddr)
+
+	var wsAuthHeaders []string
+	var wsToken string
+	if p.cfg.agentTokenPassthrough {
+		wsAuthHeaders = req.Header["Authorization"]
+	} else if p.cfg.agentToken != "" {
+		wsToken = p.cfg.agentToken
+	}
+
+	ws, err := connectWS(req.Context(), p.backendURL, p.tlsConfig, wsToken, wsAuthHeaders)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Unable to connect to minibridge end: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	defer ws.Close(1000)
+
+	p.registerSession(sid, ws)
+	defer p.unregisterSession(sid)
+
+	w.Header().Add("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Add("Connection", "keep-alive")
+	w.Header().Add("Set-Access-Control-Allow-Origin", "*")
+
+	w.WriteHeader(http.StatusOK)
+
+	rc := http.NewResponseController(w)
+
+	// TODO: SECURITY parse url and stuff correctly here.
+	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, sid); err != nil {
+		log.Error("Unable to send endpoint event", err)
+		return
+	}
+
+	if err := rc.Flush(); err != nil {
+		log.Error("Unable to flush endpoint event", err)
+		return
+	}
+
+	defer func() { _ = rc.Flush() }()
+
+	for {
+
+		select {
+
+		case <-req.Context().Done():
+			log.Debug("Client is gone")
+			return
+
+		case data := <-ws.Read():
+
+			if len(data) == 0 {
+				continue
+			}
+
+			log.Debug("Received data from backend", "data", string(data))
+
+			if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n", string(data)); err != nil {
+				log.Error("Unable to write event", err)
+				continue
+			}
+			if err := rc.Flush(); err != nil {
+				log.Error("Unable to flush remote event", err)
+				continue
+			}
+
+		case <-ws.Done():
+			log.Debug("Backend websocket is gone")
+			return
+		}
+	}
+}
+
+func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
+
+	if req.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sid := req.URL.Query().Get("sessionId")
+	if sid == "" {
+		http.Error(w, "Query parameter ID is required", http.StatusBadRequest)
+		return
+	}
+
+	accepts := req.Header.Get("Accept")
+
+	log := slog.With("sid", sid)
+	log.Debug("Handling messages", "accept", accepts)
+
+	session := p.getSession(sid)
+	if session == nil {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	data, err := io.ReadAll(req.Body)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to read body: %s", err), http.StatusBadRequest)
+		return
+	}
+	defer func() { _ = req.Body.Close() }()
+
+	log.Debug("Message data", "msg", string(data))
+
+	w.Header().Add("Connection", "keep-alive")
+	w.Header().Add("Keep-Alive", "timeout=5")
+	w.Header().Add("Transfer-Encoding", "chunked")
+	w.WriteHeader(http.StatusAccepted)
+
+	// this is against spec. however it seems to
+	// be needed by some clients..
+	_, _ = w.Write([]byte("Accepted"))
+
+	session.Write(data)
+}
+
 // ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
 // you can use this function directly into your own *http.Server.
 func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	switch req.URL.Path {
 
-	case p.cfg.messagesEndpoint:
-
-		if req.Method != http.MethodPost {
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		sid := req.URL.Query().Get("sessionId")
-		if sid == "" {
-			http.Error(w, "Query parameter ID is required", http.StatusBadRequest)
-			return
-		}
-
-		accepts := req.Header.Get("Accept")
-
-		log := slog.With("sid", sid)
-		log.Debug("Handling messages", "accept", accepts)
-
-		ws := p.getSession(sid)
-		if ws == nil {
-			http.Error(w, "Session not found", http.StatusNotFound)
-			return
-		}
-
-		data, err := io.ReadAll(req.Body)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("unable to read body: %s", err), http.StatusBadRequest)
-			return
-		}
-		defer func() { _ = req.Body.Close() }()
-
-		log.Debug("Message data", "msg", string(data))
-
-		w.Header().Add("Connection", "keep-alive")
-		w.Header().Add("Keep-Alive", "timeout=5")
-		w.Header().Add("Transfer-Encoding", "chunked")
-		w.WriteHeader(http.StatusAccepted)
-
-		// this is against spec. however it seems to
-		// be needed by some client..
-		_, _ = w.Write([]byte("Accepted"))
-
-		ws.Write(data)
-
 	case p.cfg.sseEndpoint:
+		p.handleSSE(w, req)
 
-		if req.Method != http.MethodGet {
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		sid := uuid.Must(uuid.NewV6()).String()
-		log := slog.With("sid", sid)
-
-		log.Debug("Handling new SSE", "client", req.RemoteAddr)
-
-		ws, err := connectWS(req.Context(), p.backendURL, p.tlsConfig)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Unable to connect to minibridge end: %s", err), http.StatusInternalServerError)
-			return
-		}
-
-		defer ws.Close(1000)
-
-		p.registerSession(sid, ws)
-		defer p.unregisterSession(sid)
-
-		w.Header().Add("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Add("Connection", "keep-alive")
-		w.Header().Add("Set-Access-Control-Allow-Origin", "*")
-
-		w.WriteHeader(http.StatusOK)
-
-		rc := http.NewResponseController(w)
-
-		if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, sid); err != nil {
-			log.Error("Unable to send endpoint event", err)
-			return
-		}
-
-		if err := rc.Flush(); err != nil {
-			log.Error("Unable to flush endpoint event", err)
-			return
-		}
-
-		defer func() { _ = rc.Flush() }()
-
-		for {
-			select {
-
-			case <-req.Context().Done():
-				log.Debug("Client is gone")
-				return
-
-			case data := <-ws.Read():
-
-				log.Debug("Received data from backend", "data", string(data))
-
-				if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n", string(data)); err != nil {
-					log.Error("Unable to write event", err)
-					continue
-				}
-				if err := rc.Flush(); err != nil {
-					log.Error("Unable to flush remote event", err)
-					continue
-				}
-
-			case <-ws.Done():
-				log.Debug("Backend websocket is gone")
-				return
-			}
-		}
+	case p.cfg.messagesEndpoint:
+		p.handleMessages(w, req)
 	}
 }

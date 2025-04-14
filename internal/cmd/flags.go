@@ -5,11 +5,12 @@ import (
 )
 
 var (
-	fTLSClient = pflag.NewFlagSet("tlsclient", pflag.ExitOnError)
-	fTLSServer = pflag.NewFlagSet("tlsserver", pflag.ExitOnError)
-	fProfiler  = pflag.NewFlagSet("profile", pflag.ExitOnError)
-	fHealth    = pflag.NewFlagSet("health", pflag.ExitOnError)
-	fPolicer   = pflag.NewFlagSet("police", pflag.ExitOnError)
+	fTLSClient   = pflag.NewFlagSet("tlsclient", pflag.ExitOnError)
+	fTLSServer   = pflag.NewFlagSet("tlsserver", pflag.ExitOnError)
+	fProfiler    = pflag.NewFlagSet("profile", pflag.ExitOnError)
+	fHealth      = pflag.NewFlagSet("health", pflag.ExitOnError)
+	fPolicer     = pflag.NewFlagSet("police", pflag.ExitOnError)
+	fJWTVerifier = pflag.NewFlagSet("jwtverifier", pflag.ExitOnError)
 
 	initialized = false
 )
@@ -43,4 +44,12 @@ func initSharedFlagSet() {
 	fPolicer.String("policer-token", "", "Token to use to authenticate against the Policer")
 	fPolicer.String("policer-ca", "", "CA to trust Policer server certificates")
 	fPolicer.String("policer-insecure-skip-verify", "", "Do not validate Policer CA. Do not do this")
+
+	fJWTVerifier.String("jwks-url", "", "If set, enables authentication and require JWT signed by a certificate in the given JWKS")
+	fJWTVerifier.String("jwks-ca", "", "If set, use the certificates in the provided PEM to trust the remote JWKS")
+	fJWTVerifier.Bool("jwks-insecure-skip-verify", false, "Don't validate the JWKS CA. Don't do this.")
+	fJWTVerifier.String("jwt-cert", "", "If set, enables authentication and require JWT signed by the given certificate")
+	fJWTVerifier.String("jwt-required-issuer", "", "Sets the required issuer in the JWT when auth is enabled")
+	fJWTVerifier.String("jwt-required-audience", "", "Sets the required audience in the JWT when auth is enabled")
+	fJWTVerifier.String("jwt-principal-claim", "", "Sets the identity claim to use to extract the principal user name when auth is enabled")
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/smallnest/ringbuffer"
+	"go.acuvity.ai/a3s/pkgs/claims"
+	"go.acuvity.ai/a3s/pkgs/token"
 	api "go.acuvity.ai/api/apex"
 	"go.acuvity.ai/minibridge/pkgs/client"
 	"go.acuvity.ai/minibridge/pkgs/policer"
@@ -107,6 +110,19 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	tokenString, ok := parseBasicAuth(req.Header.Get("Authorization"))
+	if (!ok || tokenString == "") && p.cfg.jwtJWKS != nil {
+		http.Error(w, "Unauthenticated", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := authenticate(tokenString, p.cfg.jwtJWKS, p.cfg.jwtRequiredIss, p.cfg.jwtRequiredAud, p.cfg.jwtPrincipalClaims)
+	if err != nil {
+		slog.Error("Authentication rejected", err)
+		http.Error(w, fmt.Sprintf("Invalid JWT: %s", err), http.StatusUnauthorized)
+		return
+	}
+
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
@@ -140,12 +156,12 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 
 			if pol := p.cfg.policer; pol != nil {
-				if err := pol.Police(req.Context(), api.PoliceRequestTypeInput, data); err != nil {
+				if err := pol.Police(req.Context(), api.PoliceRequestTypeInput, data, user); err != nil {
 					if errors.Is(err, policer.ErrBlocked) {
 						stream.Stdout <- makeMCPError(data, err)
 						continue
 					}
-					slog.Error("Unable to run analysis", err)
+					slog.Error("Unable to run input analysis", err)
 					continue
 				}
 			}
@@ -157,12 +173,12 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			slog.Debug("Received data from MCP Server", "msg", string(data))
 
 			if pol := p.cfg.policer; pol != nil {
-				if err := pol.Police(req.Context(), api.PoliceRequestTypeOutput, data); err != nil {
+				if err := pol.Police(req.Context(), api.PoliceRequestTypeOutput, data, user); err != nil {
 					if errors.Is(err, policer.ErrBlocked) {
 						stream.Stdout <- makeMCPError(data, err)
 						continue
 					}
-					slog.Error("Unable to run analysis", err)
+					slog.Error("Unable to run output analysis", err)
 					continue
 				}
 			}
@@ -198,4 +214,57 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
+}
+
+func parseBasicAuth(auth string) (password string, ok bool) {
+	const prefix = "Basic "
+	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+		parts := strings.SplitN(auth, " ", 2)
+		if len(parts) == 2 {
+			return parts[1], true
+		}
+		return "", false
+	}
+
+	c, err := base64.StdEncoding.DecodeString(auth[len(prefix):])
+	if err != nil {
+		return "", false
+	}
+	cs := string(c)
+	_, password, ok = strings.Cut(cs, ":")
+	if !ok {
+		return "", false
+	}
+	return password, true
+}
+
+func authenticate(tokenString string, jwks *token.JWKS, reqIss string, reqAud string, pClaim string) (policer.User, error) {
+
+	user := policer.User{}
+
+	if tokenString == "" || jwks == nil {
+		return user, nil
+	}
+
+	idt, err := token.Parse(tokenString, jwks, reqIss, reqAud)
+	if err != nil {
+		return user, fmt.Errorf("unable to parse token: %w", err)
+	}
+
+	cmap, err := claims.ToMap(idt.Identity)
+	if err != nil {
+		return user, fmt.Errorf("unable to parse token claims: %w", err)
+	}
+
+	pclaims := cmap[pClaim]
+	if len(pclaims) == 0 {
+		return user, fmt.Errorf("missing principal claim")
+	}
+
+	user.Claims = idt.Identity
+	user.Name = pclaims[0]
+
+	slog.Info("Authenticated agent", "name", user.Name, "claims", user.Claims)
+
+	return user, nil
 }

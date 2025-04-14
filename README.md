@@ -137,12 +137,17 @@ following format:
 
 ```json
 {
-  "messages": ["{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}"],
   "type":"Input"
+  "messages": ["{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}"],
+  "user": {
+    "name": "joe",
+    "claims": ["email=joe@acme.com", "group=mcp-users"]
+  }
 }
 ```
 
-> NOTE: for a response from the MCP Server, the `type` will be set to `Output`.
+> NOTE: for a response from the MCP Server, the `type` will be set to `Output`
+and no user will be passed.
 
 The Policer must respond with an HTTP status code `200 OK` if the request passes
 the policy checks. Any other status code will be treated as a failure, and the
