@@ -22,10 +22,7 @@ type stdioFrontend struct {
 	tlsConfig  *tls.Config
 	cfg        stdioCfg
 
-	writeQueue chan []byte
 	sync.RWMutex
-
-	sessionCond *sync.Cond
 }
 
 // NewStdio returns a new *StdioProxy that will connect to the given
@@ -41,16 +38,11 @@ func NewStdio(backend string, tlsConfig *tls.Config, opts ...OptStdio) Frontend 
 		o(&cfg)
 	}
 
-	frontend := &stdioFrontend{
+	return &stdioFrontend{
 		backendURL: backend,
 		tlsConfig:  tlsConfig,
 		cfg:        cfg,
-		writeQueue: make(chan []byte, 128),
 	}
-
-	frontend.sessionCond = sync.NewCond(&frontend.RWMutex)
-
-	return frontend
 }
 
 // Start starts the proxy. It will run until the given context is canceled or until
@@ -59,7 +51,6 @@ func (p *stdioFrontend) Start(ctx context.Context) error {
 
 	go p.wspump(ctx)
 	go p.stdiopump(ctx)
-	go p.queueWriter(ctx)
 
 	return nil
 }
@@ -88,7 +79,6 @@ func (p *stdioFrontend) connect(ctx context.Context) error {
 
 	p.Lock()
 	p.session = session
-	p.sessionCond.Broadcast()
 	p.Unlock()
 
 	return nil
@@ -170,37 +160,9 @@ func (p *stdioFrontend) stdiopump(ctx context.Context) {
 				data = append(data, '\n')
 			}
 
-			select {
-			case p.writeQueue <- data:
-			default:
-				slog.Error("Write queue is full; dropping message")
-			}
-
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-// queueWriter will consume the queue once the session is available
-func (p *stdioFrontend) queueWriter(ctx context.Context) {
-	for {
-		select {
-		case data := <-p.writeQueue:
-
-			p.Lock()
-			for p.session == nil {
-				p.sessionCond.Wait()
-
-				if err := ctx.Err(); err != nil {
-					p.Unlock()
-					return
-				}
-			}
-			s := p.session
-			p.Unlock()
-
-			s.Write(data)
+			p.RLock()
+			p.session.Write(data)
+			p.RUnlock()
 
 		case <-ctx.Done():
 			return
