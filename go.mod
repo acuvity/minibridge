@@ -17,6 +17,7 @@ require (
 	github.com/adrg/xdg v0.5.3
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/gorilla/websocket v1.5.3
+	github.com/smallnest/ringbuffer v0.0.0-20250317021400-0da97b586904
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
@@ -89,7 +90,6 @@ require (
 	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/skeema/knownhosts v1.3.0 // indirect
-	github.com/smallnest/ringbuffer v0.0.0-20250317021400-0da97b586904 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
