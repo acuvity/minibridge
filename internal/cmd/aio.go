@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -144,6 +145,7 @@ var AIO = &cobra.Command{
 				)
 			}
 
+			time.Sleep(300 * time.Millisecond)
 			return proxy.Start(ctx)
 		})
 
