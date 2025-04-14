@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"go.acuvity.ai/wsc"
@@ -18,11 +17,9 @@ import (
 
 type stdioFrontend struct {
 	backendURL string
-	session    wsc.Websocket
 	tlsConfig  *tls.Config
 	cfg        stdioCfg
-
-	sync.RWMutex
+	wsWrite    chan []byte
 }
 
 // NewStdio returns a new *StdioProxy that will connect to the given
@@ -41,6 +38,7 @@ func NewStdio(backend string, tlsConfig *tls.Config, opts ...OptStdio) Frontend 
 	return &stdioFrontend{
 		backendURL: backend,
 		tlsConfig:  tlsConfig,
+		wsWrite:    make(chan []byte),
 		cfg:        cfg,
 	}
 }
@@ -55,36 +53,32 @@ func (p *stdioFrontend) Start(ctx context.Context) error {
 	return nil
 }
 
-func (p *stdioFrontend) connect(ctx context.Context) error {
-
-	session, resp, err := wsc.Connect(
-		ctx,
-		p.backendURL,
-		wsc.Config{
-			WriteChanSize: 64,
-			ReadChanSize:  16,
-			TLSConfig:     p.tlsConfig,
-		},
-	)
-
-	if err != nil {
-		return fmt.Errorf("unable to connect to the websocket '%s': %w", p.backendURL, err)
-	}
-
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusSwitchingProtocols {
-		return fmt.Errorf("invalid response from other end of the tunnel (must be 101): %s", resp.Status)
-	}
-
-	p.Lock()
-	p.session = session
-	p.Unlock()
-
-	return nil
-}
-
 func (p *stdioFrontend) wspump(ctx context.Context) {
+
+	connect := func(ctx context.Context) (wsc.Websocket, error) {
+
+		session, resp, err := wsc.Connect(
+			ctx,
+			p.backendURL,
+			wsc.Config{
+				WriteChanSize: 64,
+				ReadChanSize:  16,
+				TLSConfig:     p.tlsConfig,
+			},
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("unable to connect to the websocket '%s': %w", p.backendURL, err)
+		}
+
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusSwitchingProtocols {
+			return nil, fmt.Errorf("invalid response from other end of the tunnel (must be 101): %s", resp.Status)
+		}
+
+		return session, nil
+	}
 
 	var failures int
 
@@ -96,7 +90,8 @@ func (p *stdioFrontend) wspump(ctx context.Context) {
 			return
 
 		default:
-			if err := p.connect(ctx); err != nil {
+			session, err := connect(ctx)
+			if err != nil {
 				if failures == 1 {
 					slog.Error("Unable to connect. Will retry", err)
 				}
@@ -115,19 +110,22 @@ func (p *stdioFrontend) wspump(ctx context.Context) {
 
 				select {
 
-				case data := <-p.session.Read():
+				case data := <-p.wsWrite:
+					session.Write(data)
+
+				case data := <-session.Read():
 					fmt.Println(string(data))
 
-				case err := <-p.session.Error():
+				case err := <-session.Error():
 					failures++
 					slog.Error("Error from webscoket", err)
 
-				case <-p.session.Done():
+				case <-session.Done():
 					failures++
 					break L
 
 				case <-ctx.Done():
-					p.session.Close(1000)
+					session.Close(1000)
 					return
 				}
 			}
@@ -160,9 +158,7 @@ func (p *stdioFrontend) stdiopump(ctx context.Context) {
 				data = append(data, '\n')
 			}
 
-			p.RLock()
-			p.session.Write(data)
-			p.RUnlock()
+			p.wsWrite <- data
 
 		case <-ctx.Done():
 			return
