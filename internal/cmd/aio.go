@@ -32,7 +32,7 @@ func init() {
 
 	AIO.Flags().AddFlagSet(fAIO)
 	AIO.Flags().AddFlagSet(fPolicer)
-	AIO.Flags().AddFlagSet(fTLSFrontend)
+	AIO.Flags().AddFlagSet(fTLSServer)
 	AIO.Flags().AddFlagSet(fHealth)
 	AIO.Flags().AddFlagSet(fProfiler)
 }
@@ -67,15 +67,15 @@ var AIO = &cobra.Command{
 			return fmt.Errorf("unable to make policer: %w", err)
 		}
 
-		frontendTLSConfig, err := tlsConfigFromFlags(fTLSBackend)
+		frontendClientTLSConfig, err := tlsConfigFromFlags(fTLSClient)
 		if err != nil {
 			return err
 		}
-		if frontendTLSConfig == nil {
-			frontendTLSConfig = &tls.Config{}
+		if frontendClientTLSConfig == nil {
+			frontendClientTLSConfig = &tls.Config{}
 		}
 
-		frontendTLSConfig.RootCAs = trustPool
+		frontendClientTLSConfig.RootCAs = trustPool
 
 		startHelperServers(ctx)
 
@@ -113,16 +113,22 @@ var AIO = &cobra.Command{
 
 			var proxy frontend.Frontend
 
+			frontendTLSConfig, err := tlsConfigFromFlags(fTLSServer)
+			if err != nil {
+				return err
+			}
+
 			if listen != "" {
 
 				slog.Info("Starting frontend",
 					"mode", "sse",
+					"tls", frontendTLSConfig != nil,
 					"listen", listen,
 					"sse", sseEndpoint,
 					"messages", messageEndpoint,
 				)
 
-				proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig,
+				proxy = frontend.NewSSE(listen, backendURL, frontendClientTLSConfig, frontendTLSConfig,
 					frontend.OptSSEStreamEndpoint(sseEndpoint),
 					frontend.OptSSEMessageEndpoint(messageEndpoint),
 				)

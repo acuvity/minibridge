@@ -64,7 +64,7 @@ func (p *wsBackend) Start(ctx context.Context) error {
 		} else {
 			if err := p.server.ListenAndServeTLS("", ""); err != nil {
 				if !errors.Is(err, http.ErrServerClosed) {
-					slog.Error("unable to start server", "err", err)
+					slog.Error("unable to start tls server", "err", err)
 				}
 				errCh <- err
 			}

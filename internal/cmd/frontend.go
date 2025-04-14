@@ -21,7 +21,8 @@ func init() {
 	fFrontend.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
 
 	Frontend.Flags().AddFlagSet(fFrontend)
-	Frontend.Flags().AddFlagSet(fTLSBackend)
+	Frontend.Flags().AddFlagSet(fTLSClient)
+	Frontend.Flags().AddFlagSet(fTLSServer)
 	Frontend.Flags().AddFlagSet(fHealth)
 	Frontend.Flags().AddFlagSet(fProfiler)
 }
@@ -41,7 +42,7 @@ var Frontend = &cobra.Command{
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 
-		tlsConfig, err := tlsConfigFromFlags(fTLSBackend)
+		backendTLSConfig, err := tlsConfigFromFlags(fTLSClient)
 		if err != nil {
 			return err
 		}
@@ -52,15 +53,21 @@ var Frontend = &cobra.Command{
 
 		if listen != "" {
 
+			frontendTLSConfig, err := tlsConfigFromFlags(fTLSServer)
+			if err != nil {
+				return err
+			}
+
 			slog.Info("Starting frontend",
 				"mode", "sse",
+				"tls", frontendTLSConfig != nil,
 				"backend", backendURL,
 				"listen", listen,
 				"sse", sseEndpoint,
 				"messages", messageEndpoint,
 			)
 
-			proxy = frontend.NewSSE(listen, backendURL, tlsConfig,
+			proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig, backendTLSConfig,
 				frontend.OptSSEStreamEndpoint(sseEndpoint),
 				frontend.OptSSEMessageEndpoint(messageEndpoint),
 			)
@@ -72,7 +79,7 @@ var Frontend = &cobra.Command{
 				"backend", backendURL,
 			)
 
-			proxy = frontend.NewStdio(backendURL, tlsConfig)
+			proxy = frontend.NewStdio(backendURL, backendTLSConfig)
 		}
 
 		return proxy.Start(cmd.Context())

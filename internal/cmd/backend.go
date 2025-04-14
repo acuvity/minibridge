@@ -21,7 +21,7 @@ func init() {
 
 	Backend.Flags().AddFlagSet(fBackend)
 	Backend.Flags().AddFlagSet(fPolicer)
-	Backend.Flags().AddFlagSet(fTLSFrontend)
+	Backend.Flags().AddFlagSet(fTLSServer)
 	Backend.Flags().AddFlagSet(fHealth)
 	Backend.Flags().AddFlagSet(fProfiler)
 }
@@ -40,7 +40,7 @@ var Backend = &cobra.Command{
 		listen := viper.GetString("listen")
 		policerURL := viper.GetString("policer-url")
 
-		backendTLSConfig, err := tlsConfigFromFlags(fTLSFrontend)
+		backendTLSConfig, err := tlsConfigFromFlags(fTLSServer)
 		if err != nil {
 			return err
 		}

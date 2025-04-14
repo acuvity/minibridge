@@ -28,9 +28,20 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 		InsecureSkipVerify: skipVerify,
 	}
 
-	certPath, _ := flags.GetString("cert")
-	keyPath, _ := flags.GetString("key")
-	keyPass, _ := flags.GetString("key-pass")
+	var certPath, keyPath, keyPass string
+
+	if flags.Name() == "tlsclient" {
+		certPath, _ = flags.GetString("client-cert")
+		keyPath, _ = flags.GetString("client-key")
+		keyPass, _ = flags.GetString("client-key-pass")
+	}
+
+	if flags.Name() == "tlsserver" {
+		certPath, _ = flags.GetString("cert")
+		keyPath, _ = flags.GetString("key")
+		keyPass, _ = flags.GetString("key-pass")
+	}
+
 	serverCAPath, _ := flags.GetString("server-ca")
 	clientCAPath, _ := flags.GetString("client-ca")
 
