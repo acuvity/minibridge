@@ -6,11 +6,15 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/smallnest/ringbuffer"
 	api "go.acuvity.ai/api/apex"
 	"go.acuvity.ai/minibridge/pkgs/client"
 	"go.acuvity.ai/minibridge/pkgs/policer"
@@ -121,6 +125,8 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	defer session.Close(1001)
 
+	rb := ringbuffer.New(4096)
+
 	for {
 
 		select {
@@ -164,10 +170,23 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			session.Write(data)
 
 		case data := <-stream.Stderr:
-			slog.Debug("Command", "log", string(data))
+			_, _ = rb.Write(data)
+			slog.Debug("MCP Server Log", "stderr", string(data))
 
 		case err := <-stream.Exit:
+			select {
+			case data := <-stream.Stderr:
+				_, _ = rb.Write(data)
+			default:
+			}
+			data, _ := io.ReadAll(rb)
 			slog.Error("MCP Server exited", err)
+
+			if p.cfg.dumpStderr {
+				_, _ = fmt.Fprintf(os.Stderr, "---\n%s\n---\n", strings.TrimSpace(string(data)))
+			} else {
+				slog.Error("MCP Server stderr", "stderr", string(data))
+			}
 			return
 
 		case <-session.Done():

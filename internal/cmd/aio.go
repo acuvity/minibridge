@@ -102,6 +102,7 @@ var AIO = &cobra.Command{
 
 			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
 				backend.OptWSPolicer(policer),
+				backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
 			)
 
 			return proxy.Start(ctx)

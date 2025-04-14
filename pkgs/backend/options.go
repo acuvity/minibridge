@@ -5,7 +5,8 @@ import (
 )
 
 type wsCfg struct {
-	policer policer.Policer
+	policer    policer.Policer
+	dumpStderr bool
 }
 
 func newWSCfg() wsCfg {
@@ -19,5 +20,13 @@ type OptWS func(*wsCfg)
 func OptWSPolicer(policer policer.Policer) OptWS {
 	return func(cfg *wsCfg) {
 		cfg.policer = policer
+	}
+}
+
+// OptWSDumpStderrOnError controls whether the WS server should
+// dump the stderr of the MCP server as is, or in a log.
+func OptWSDumpStderrOnError(dump bool) OptWS {
+	return func(cfg *wsCfg) {
+		cfg.dumpStderr = dump
 	}
 }

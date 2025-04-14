@@ -65,6 +65,7 @@ var Backend = &cobra.Command{
 
 		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,
 			backend.OptWSPolicer(policer),
+			backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
 		)
 
 		return proxy.Start(cmd.Context())
