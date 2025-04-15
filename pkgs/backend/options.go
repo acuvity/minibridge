@@ -2,6 +2,7 @@ package backend
 
 import (
 	"go.acuvity.ai/a3s/pkgs/token"
+	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 )
 
@@ -12,6 +13,7 @@ type wsCfg struct {
 	jwtRequiredIss     string
 	jwtRequiredAud     string
 	jwtPrincipalClaims string
+	corsPolicy         *bahamut.CORSPolicy
 }
 
 func newWSCfg() wsCfg {
@@ -43,5 +45,13 @@ func OptWSAuth(jwks *token.JWKS, principalClaim string, requiredIssuer string, r
 		cfg.jwtRequiredIss = requiredIssuer
 		cfg.jwtRequiredAud = requiredAudience
 		cfg.jwtPrincipalClaims = principalClaim
+	}
+}
+
+// OptWSCORSPolicy sets the bahamut.CORSPolicy to use for
+// connection originating from a webrowser.
+func OptWSCORSPolicy(policy *bahamut.CORSPolicy) OptWS {
+	return func(cfg *wsCfg) {
+		cfg.corsPolicy = policy
 	}
 }

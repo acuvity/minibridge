@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"go.acuvity.ai/minibridge/pkgs/cors"
 	"go.acuvity.ai/wsc"
 )
 
@@ -143,7 +144,6 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Add("Connection", "keep-alive")
-	w.Header().Add("Set-Access-Control-Allow-Origin", "*")
 
 	w.WriteHeader(http.StatusOK)
 
@@ -241,6 +241,10 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 // ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
 // you can use this function directly into your own *http.Server.
 func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+
+	if !cors.HandleGenericHeaders(w, req, p.cfg.corsPolicy) {
+		return
+	}
 
 	switch req.URL.Path {
 

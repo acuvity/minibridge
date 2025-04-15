@@ -20,6 +20,7 @@ import (
 	"go.acuvity.ai/a3s/pkgs/token"
 	api "go.acuvity.ai/api/apex"
 	"go.acuvity.ai/minibridge/pkgs/client"
+	"go.acuvity.ai/minibridge/pkgs/cors"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/wsc"
 )
@@ -92,6 +93,10 @@ func (p *wsBackend) Start(ctx context.Context) error {
 
 func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
+	if !cors.HandleGenericHeaders(w, req, p.cfg.corsPolicy) {
+		return
+	}
+
 	if req.Method != http.MethodGet || req.URL.Path != "/ws" {
 		http.Error(w, "only supports GET /ws", http.StatusBadRequest)
 		return
@@ -112,6 +117,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	tokenString, ok := parseBasicAuth(req.Header.Get("Authorization"))
 	if (!ok || tokenString == "") && p.cfg.jwtJWKS != nil {
+		slog.Error("Authentication invalid", "reason", "no token provided")
 		http.Error(w, "Unauthenticated", http.StatusUnauthorized)
 		return
 	}
@@ -129,7 +135,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	ws, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("unable to start websocket: %s", err), http.StatusBadRequest)
+		slog.Error("Unable to upgrade to websocket", err)
 		return
 	}
 

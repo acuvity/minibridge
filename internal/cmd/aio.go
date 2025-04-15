@@ -38,6 +38,7 @@ func init() {
 	AIO.Flags().AddFlagSet(fHealth)
 	AIO.Flags().AddFlagSet(fProfiler)
 	AIO.Flags().AddFlagSet(fJWTVerifier)
+	AIO.Flags().AddFlagSet(fCORS)
 }
 
 var AIO = &cobra.Command{
@@ -92,6 +93,8 @@ var AIO = &cobra.Command{
 		}
 
 		frontendClientTLSConfig.RootCAs = trustPool
+
+		corsPolicy := makeCORSPolicy()
 
 		startHelperServers(ctx)
 
@@ -152,6 +155,7 @@ var AIO = &cobra.Command{
 					frontend.OptSSEMessageEndpoint(messageEndpoint),
 					frontend.OptSSEAgentToken(agentToken),
 					frontend.OptSSEAgentTokenPassthrough(true),
+					frontend.OptSSECORSPolicy(corsPolicy),
 				)
 			} else {
 

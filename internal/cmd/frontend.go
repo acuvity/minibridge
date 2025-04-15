@@ -27,6 +27,7 @@ func init() {
 	Frontend.Flags().AddFlagSet(fTLSServer)
 	Frontend.Flags().AddFlagSet(fHealth)
 	Frontend.Flags().AddFlagSet(fProfiler)
+	Frontend.Flags().AddFlagSet(fCORS)
 }
 
 // Frontend is the cobra command to run the client.
@@ -58,6 +59,8 @@ var Frontend = &cobra.Command{
 			return err
 		}
 
+		corsPolicy := makeCORSPolicy()
+
 		startHelperServers(cmd.Context())
 
 		var proxy frontend.Frontend
@@ -85,6 +88,7 @@ var Frontend = &cobra.Command{
 				frontend.OptSSEMessageEndpoint(messageEndpoint),
 				frontend.OptSSEAgentToken(agentToken),
 				frontend.OptSSEAgentTokenPassthrough(agentTokenPassthrough),
+				frontend.OptSSECORSPolicy(corsPolicy),
 			)
 
 		} else {

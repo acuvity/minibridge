@@ -262,3 +262,30 @@ func makeJWKS(ctx context.Context, cfg jwtVerifierConfig) (jwks *token.JWKS, err
 
 	return jwks, nil
 }
+
+func makeCORSPolicy() *bahamut.CORSPolicy {
+
+	origin, _ := fCORS.GetString("cors-origin")
+
+	if origin == "mirror" {
+		origin = bahamut.CORSOriginMirror
+	}
+
+	return &bahamut.CORSPolicy{
+		AllowOrigin:      origin,
+		AllowCredentials: true,
+		MaxAge:           1500,
+		AllowHeaders: []string{
+			"Authorization",
+			"Accept",
+			"Content-Type",
+			"Cache-Control",
+			"Cookie",
+		},
+		AllowMethods: []string{
+			"GET",
+			"POST",
+			"OPTIONS",
+		},
+	}
+}

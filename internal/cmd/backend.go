@@ -25,6 +25,7 @@ func init() {
 	Backend.Flags().AddFlagSet(fHealth)
 	Backend.Flags().AddFlagSet(fProfiler)
 	Backend.Flags().AddFlagSet(fJWTVerifier)
+	Backend.Flags().AddFlagSet(fCORS)
 }
 
 // Backend is the cobra command to run the server.
@@ -57,6 +58,8 @@ var Backend = &cobra.Command{
 			return fmt.Errorf("unable to make policer: %w", err)
 		}
 
+		corsPolicy := makeCORSPolicy()
+
 		startHelperServers(cmd.Context())
 
 		mcpServer := client.MCPServer{Command: args[0], Args: args[1:]}
@@ -74,6 +77,7 @@ var Backend = &cobra.Command{
 			backend.OptWSPolicer(policer),
 			backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
 			backend.OptWSAuth(jwks, jwtVerifierConfig.principalClaim, jwtVerifierConfig.reqIss, jwtVerifierConfig.reqAud),
+			backend.OptWSCORSPolicy(corsPolicy),
 		)
 
 		return proxy.Start(cmd.Context())

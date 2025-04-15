@@ -1,10 +1,13 @@
 package frontend
 
+import "go.acuvity.ai/bahamut"
+
 type sseCfg struct {
 	sseEndpoint           string
 	messagesEndpoint      string
 	agentTokenPassthrough bool
 	agentToken            string
+	corsPolicy            *bahamut.CORSPolicy
 }
 
 func newSSECfg() sseCfg {
@@ -23,6 +26,14 @@ type OptSSE func(*sseCfg)
 func OptSSEStreamEndpoint(ep string) OptSSE {
 	return func(cfg *sseCfg) {
 		cfg.sseEndpoint = ep
+	}
+}
+
+// OptSSECORSPolicy sets the bahamut.CORSPolicy to use for
+// connection originating from a webrowser.
+func OptSSECORSPolicy(policy *bahamut.CORSPolicy) OptSSE {
+	return func(cfg *sseCfg) {
+		cfg.corsPolicy = policy
 	}
 }
 

@@ -11,6 +11,7 @@ var (
 	fHealth      = pflag.NewFlagSet("health", pflag.ExitOnError)
 	fPolicer     = pflag.NewFlagSet("police", pflag.ExitOnError)
 	fJWTVerifier = pflag.NewFlagSet("jwtverifier", pflag.ExitOnError)
+	fCORS        = pflag.NewFlagSet("cors", pflag.ExitOnError)
 
 	initialized = false
 )
@@ -52,4 +53,6 @@ func initSharedFlagSet() {
 	fJWTVerifier.StringP("auth-jwt-required-audience", "A", "", "Sets the required audience in the JWT when auth is enabled")
 	fJWTVerifier.StringP("auth-jwt-principal-claim", "S", "", "Sets the identity claim to use to extract the principal user name when auth is enabled")
 	fJWTVerifier.Bool("auth-jwks-insecure-skip-verify", false, "Don't validate the JWKS CA. Don't do this.")
+
+	fCORS.String("cors-origin", "*", "Sets the valid HTTP Origin for CORS")
 }
