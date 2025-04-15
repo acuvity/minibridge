@@ -48,10 +48,6 @@ var Frontend = &cobra.Command{
 		agentToken := viper.GetString("agent-token")
 		agentTokenPassthrough := viper.GetBool("agent-token-passthrough")
 
-		if listen == "" {
-			return fmt.Errorf("--listen must be set")
-		}
-
 		if backendURL == "" {
 			return fmt.Errorf("--backend must be set")
 		}
