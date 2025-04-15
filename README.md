@@ -2,8 +2,9 @@
 
 Minibridge serves as a bridge between MCP servers and the outside world. It
 functions as a backend-to-frontend connector, facilitating communication between
-Agents and MCP servers. It securely exposes MCP servers to the internet and
-optionally enables seamless integration with the Acuvity Platform.
+Agents and MCP servers. It allows to securely exposes MCP servers to the internet and
+optionally enables seamless integration with a generic policing service for
+agent authentication and content analysis.
 
 Minibridge does not need to interpret the core MCP protocol, as it only handles
 data streams. This design ensures forward compatibility with future changes to
@@ -26,6 +27,16 @@ To start everything as a single process, run:
 This command launches both the frontend and backend within a single process,
 which can be useful in certain scenarios.
 
+You can connect directly using an HTTP client:
+
+    $ curl http://127.0.0.1:8000/sse
+    event: endpoint
+    data: /message?sessionId=UID
+
+    $ curl http://127.0.0.1:8000/message?sessionId=UID \
+      -X POST \
+      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+
 The flow will look like the following:
 
 ```mermaid
@@ -33,6 +44,30 @@ flowchart LR
     agent -- http+sse --> minibridge
     minibridge -- stdio --> mcpserver
 ```
+
+In order to secure the connections, you need to enable HTTPS for incoming
+connections:
+
+    minibridge aio --listen :8443 \
+      --tls-server-cert ./server-cert.pem \
+      --tls-server-key ./server-key.pem \
+      --tls-server-client-ca ./clients-ca.pem \
+      -- npx -y @modelcontextprotocol/server-filesystem /tmp
+
+This enables HTTPS and with `--tls-server-client-ca`, it requires the clients to
+send a certificate signed by that client CA.
+
+You can now connect directly using an HTTP client:
+
+    $ curl https://127.0.0.1:8443/sse \
+      --cacert ./server-cert.pem --cert ./client-cert.pem --key ./client-key.pem
+    event: endpoint
+    data: /message?sessionId=UID
+
+    $ curl https://127.0.0.1:8443/message?sessionId=UID \
+      --cacert ./server-cert.pem --cert ./client-cert.pem --key ./client-key.pem \
+      -X POST \
+      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 
 ## Backend
 
@@ -46,7 +81,7 @@ For example, to start a filesystem-based MCP server:
 
 You can now connect directly using a websocket client:
 
-    wscat --connect ws://127.0.0.1:8080/ws
+    wscat --connect ws://127.0.0.1:8000/ws
 
 > NOTE: use the `wss` scheme if you have started minibridge backend with TLS.
 
@@ -59,6 +94,22 @@ flowchart LR
     agent -- websocket --> minibridge
     minibridge -- stdio --> mcpserver
 ```
+
+In order to secure the connections, you need to enable HTTPS for incoming
+connections:
+
+    minibridge backend --listen :8443 \
+      --tls-server-cert ./backend-server-cert.pem \
+      --tls-server-key ./backend-server-key.pem \
+      --tls-server-client-ca ./clients-ca.pem \
+      -- npx -y @modelcontextprotocol/server-filesystem /tmp
+
+This enables HTTPS and with `--tls-server-client-ca`, it requires the clients to
+send a certificate signed by that client CA. You can now connect using:
+
+    wscat --connect wss://127.0.0.1:8443/ws \
+      --ca ./server-cert.pem \
+      --cert ./client-cert.pem
 
 ## Frontend
 
@@ -98,6 +149,16 @@ each incoming connection to the /sse endpoint. This preserves session state.
 However, the WebSocket will not attempt to reconnect in this mode, and any
 active streams will be terminated in the event of a network failure.
 
+You can connect directly using an HTTP client:
+
+    $ curl http://127.0.0.1:8001/sse
+    event: endpoint
+    data: /message?sessionId=UID
+
+    $ curl http://127.0.0.1:8001/message?sessionId=UID \
+      -X POST \
+      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+
 The flow will look like the following:
 
 ```mermaid
@@ -106,6 +167,35 @@ flowchart LR
     mb1 -- websocket --> mb2[minibridge]
     mb2 -- stdio --> mcpserver
 ```
+
+In order to secure the connections, you need to enable HTTPS for incoming
+connections:
+
+    minibridge frontend --listen :8444 \
+      --backend wss://127.0.0.1:8000/ws
+      --tls-server-cert ./server-cert.pem \
+      --tls-server-key ./server-key.pem \
+      --tls-server-client-ca client-ca.pem ]\
+      --tls-client-cert ./client-cert.pem \
+      --tls-client-key ./client-key.pem \
+      --tls-client-backend-ca ./backend-server-cert.pem
+
+This enables HTTPS and with `--tls-server-client-ca`, it requires the clients to
+send a certificate signed by that client CA. It also make the front end to
+authenticate to the backend using the provided client certificate (MTLS).
+
+You can now connect directly using an HTTP client:
+
+    $ curl https://127.0.0.1:8444/sse \
+      --cacert ./server-cert.pem --cert ./client-cert.pem --key ./client-key.pem
+    event: endpoint
+    data: /message?sessionId=UID
+
+    $ curl https://127.0.0.1:8444/message?sessionId=UID \
+      --cacert ./server-cert.pem --cert ./client-cert.pem --key ./client-key.pem \
+      -X POST \
+      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+
 
 ## Policer Integration
 
@@ -185,8 +275,8 @@ Example:
 Minibridge is still missing the following features:
 
 - [ ] Unit tests
-- [ ] Transport user information over the websocket channel
-- [ ] Support for user extraction to pass to the policer
+- [x] Transport user information over the websocket channel
+- [x] Support for user extraction to pass to the policer
 - [ ] Optimize communications between front/back in aio mode
 - [ ] Plug in prometheus metrics
 - [ ] Support connecting to an MCP server using HTTP
