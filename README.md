@@ -15,6 +15,23 @@ version 2024-11-05. Support for version 2025-03-26 is in progress.
 
 > Note: Minibridge is still under active development.
 
+
+## Table of Content
+
+<!-- vim-markdown-toc GFM -->
+
+* [All In One](#all-in-one)
+* [Backend](#backend)
+* [Frontend](#frontend)
+  * [Stdio](#stdio)
+  * [HTTP+SSE](#httpsse)
+* [Policer and Authentication](#policer-and-authentication)
+  * [Policer](#policer)
+  * [Authentication](#authentication)
+* [Todos](#todos)
+
+<!-- vim-markdown-toc -->
+
 ## All In One
 
 Minibridge can act as a single gateway positioned in front of a standard
@@ -119,7 +136,7 @@ existing agents, the frontend can expose a local interface using POST+SSE,
 HTTP+STREAM (coming soon), or plain STDIO. It will then transparently forward
 the data to the Minibridge backend over WebSockets and HTTPS.
 
-### Stdio Frontend
+### Stdio
 
 To start an stdio frontend:
 
@@ -138,7 +155,7 @@ flowchart LR
     mb2 -- stdio --> mcpserver
 ```
 
-### SSE Frontend
+### HTTP+SSE
 
 To start an SSE frontend:
 
@@ -196,18 +213,18 @@ You can now connect directly using an HTTP client:
       -X POST \
       -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 
-
-## Policer Integration
+## Policer and Authentication
 
 While Minibridge already offers advanced features such as strong client
 authentication and native WebSocket support, it can be further enhanced through
 integration with a Policer. A Policer is responsible for:
 
-* User authentication
-* Role-based user authorization
+* Authorization
 * Input analysis and logging
 * Full request tracing
 * And more advanced policy-based controls
+
+### Policer
 
 The Policer, if set, will be called and passed various information so it can
 make a decision on what to do with the request, based on the user who initiated
@@ -216,7 +233,7 @@ the request and the content of the request.
 You can then start Minibridge, using either the aio or backend subcommand, with
 the following arguments:
 
-    minibridge aio --policer-url https://policer.acme.com/police --policer-token $APPTOKEN
+    minibridge aio --policer-url https://policer.acme.com/police --policer-token $PTOKEN
 
 Once integrated, any command from the user or response from the MCP Server
 received by the backend is first passed to the Policer for authentication and/or
@@ -260,7 +277,6 @@ For a policy result that denies the request:
 }
 ```
 
-
 If the request is denied (or the Policer does not return `200 OK`), Minibridge
 will not forward it to the MCP server. Instead, it will return a descriptive MCP
 error to the client, indicating why the request was blocked.
@@ -268,7 +284,46 @@ error to the client, indicating why the request was blocked.
 Example:
 
     $ mcptools tools http://127.0.0.1:8000
-    error: RPC error 451: request blocked: ForbiddenUser: I'm afraid you cannot do this, Dave
+    error: RPC error 451: request blocked: ForbiddenUser: You are not allowed to list the tools
+
+### Authentication
+
+In order for the policer to identify a particular user (instead of using the
+identity contained into `--policer-token`), Minibridge supports JWT verification
+and information extraction.
+
+To start minibridge with auth enabled:
+
+    minibridge backend \
+      --policer-url https://policer.acme.com/police --policer-token $PTOKEN \
+      --auth-jwks-url https://myidp.com/.well-known/jwks.json \
+      --auth-jwt-principal-claim email
+
+This makes the backend (or AIO backend) requires clients to pass a JWT signed by
+a key contained in the JWKS available at
+`https://myidp.com/.well-known/jwks.json`.
+
+Instead of a JWKS, you can use local certificates contained into a PEM file by
+passing `--auth-jwt-cert ./jwt.pem` instead of setting `--auth-jwks-url`.
+
+You can also require a specific issuer and audience with the flags
+`--auth-jwt-required-issuer` and `--auth-jwt-required-audience`
+
+The principal claim is used to extract a particular key from the JWT's
+`identity` property and use it as the principal name when sending policing
+request to the policer.
+
+Now that the backend requires a JWT, you have 2 options for the frontend to
+forward the user JWT:
+
+* Either you set a global token for the frontend using the flag `--agent-token`:
+
+      minibridge frontend -l :8001 --agent-token $TOKEN
+
+* Or you forward the incoming `Authorization` header as-is to the backend with
+`--agent-token-passthrough`:
+
+      minibridge frontend -l :8001 --agent-token-passthrough
 
 ## Todos
 
