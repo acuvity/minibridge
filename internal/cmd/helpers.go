@@ -33,19 +33,18 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 	var certPath, keyPath, keyPass string
 
 	if flags.Name() == "tlsclient" {
-		certPath, _ = flags.GetString("client-cert")
-		keyPath, _ = flags.GetString("client-key")
-		keyPass, _ = flags.GetString("client-key-pass")
+		certPath, _ = flags.GetString("tls-client-cert")
+		keyPath, _ = flags.GetString("tls-client-key")
+		keyPass, _ = flags.GetString("tls-client-key-pass")
 	}
+	serverCAPath, _ := flags.GetString("tls-client-server-ca")
 
 	if flags.Name() == "tlsserver" {
-		certPath, _ = flags.GetString("cert")
-		keyPath, _ = flags.GetString("key")
-		keyPass, _ = flags.GetString("key-pass")
+		certPath, _ = flags.GetString("tls-server-cert")
+		keyPath, _ = flags.GetString("tls-server-key")
+		keyPass, _ = flags.GetString("tls-server-key-pass")
 	}
-
-	serverCAPath, _ := flags.GetString("server-ca")
-	clientCAPath, _ := flags.GetString("client-ca")
+	clientCAPath, _ := flags.GetString("tls-serverclient-ca")
 
 	if certPath != "" && keyPath != "" {
 		x509Cert, x509Key, err := tglib.ReadCertificatePEM(certPath, keyPath, keyPass)
@@ -108,13 +107,13 @@ func jwtVerifierConfigFromFlags() jwtVerifierConfig {
 
 	cfg := jwtVerifierConfig{}
 
-	cfg.jwksURL, _ = fJWTVerifier.GetString("jwks-url")
-	cfg.jwksCAPath, _ = fJWTVerifier.GetString("jwks-ca")
-	cfg.jwksSkipVerify, _ = fJWTVerifier.GetBool("jwks-insecure-skip-verify")
-	cfg.jwtCertPath, _ = fJWTVerifier.GetString("jwt-cert")
-	cfg.reqIss, _ = fJWTVerifier.GetString("jwt-required-issuer")
-	cfg.reqAud, _ = fJWTVerifier.GetString("jwt-required-audience")
-	cfg.principalClaim, _ = fJWTVerifier.GetString("jwt-principal-claim")
+	cfg.jwksURL, _ = fJWTVerifier.GetString("auth-jwks-url")
+	cfg.jwksCAPath, _ = fJWTVerifier.GetString("auth-jwks-ca")
+	cfg.jwksSkipVerify, _ = fJWTVerifier.GetBool("auth-jwks-insecure-skip-verify")
+	cfg.jwtCertPath, _ = fJWTVerifier.GetString("auth-jwt-cert")
+	cfg.reqIss, _ = fJWTVerifier.GetString("auth-jwt-required-issuer")
+	cfg.reqAud, _ = fJWTVerifier.GetString("auth-jwt-required-audience")
+	cfg.principalClaim, _ = fJWTVerifier.GetString("auth-jwt-principal-claim")
 
 	if cfg.jwksURL != "" || cfg.jwtCertPath != "" {
 		slog.Info("JWT verifier configured",

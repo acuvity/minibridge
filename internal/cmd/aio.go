@@ -27,9 +27,10 @@ func init() {
 
 	initSharedFlagSet()
 
-	fAIO.String("listen", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
+	fAIO.StringP("listen", "l", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
 	fAIO.String("endpoint-messages", "/message", "When using HTTP, sets the endpoint to post messages")
 	fAIO.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
+	fAIO.StringP("agent-token", "t", "", "The user token to pass inline to the minibridge backend to identify the agent that will be passed to the policer. You must use sse server by setting --listen and configure tls for communications with minibridghe backend")
 
 	AIO.Flags().AddFlagSet(fAIO)
 	AIO.Flags().AddFlagSet(fPolicer)
@@ -58,6 +59,13 @@ var AIO = &cobra.Command{
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 		policerURL := viper.GetString("policer-url")
+		agentToken := viper.GetString("agent-token")
+
+		if agentToken != "" {
+			slog.Info("Agent authentication enabled",
+				"token", agentToken != "",
+			)
+		}
 
 		jwtVConfig := jwtVerifierConfigFromFlags()
 		jwks, err := makeJWKS(cmd.Context(), jwtVConfig)
@@ -136,11 +144,13 @@ var AIO = &cobra.Command{
 					"listen", listen,
 					"sse", sseEndpoint,
 					"messages", messageEndpoint,
+					"agent-token", agentToken != "",
 				)
 
 				proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig, frontendClientTLSConfig,
 					frontend.OptSSEStreamEndpoint(sseEndpoint),
 					frontend.OptSSEMessageEndpoint(messageEndpoint),
+					frontend.OptSSEAgentToken(agentToken),
 					frontend.OptSSEAgentTokenPassthrough(true),
 				)
 			} else {
@@ -151,6 +161,7 @@ var AIO = &cobra.Command{
 
 				proxy = frontend.NewStdio(backendURL, frontendClientTLSConfig,
 					frontend.OptStdioRetry(false),
+					frontend.OptStioAgentToken(agentToken),
 				)
 			}
 

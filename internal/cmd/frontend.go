@@ -15,12 +15,12 @@ func init() {
 
 	initSharedFlagSet()
 
-	fFrontend.String("listen", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
-	fFrontend.String("backend", "", "Address of the minibridge backend")
+	fFrontend.StringP("listen", "l", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
+	fFrontend.StringP("backend", "A", "", "Address of the minibridge backend")
 	fFrontend.String("endpoint-messages", "/message", "When using HTTP, sets the endpoint to post messages")
 	fFrontend.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
-	fFrontend.String("agent-token", "", "The user token to pass inline to the minibridge backend to identify the agent that will be passed to the policer. You must use sse server by setting --listen and configure tls for communications with minibridghe backend")
-	fFrontend.Bool("agent-token-passthrough", false, "If set, the HTTP Authorization header of the incoming agent request will be forwarded as-is to the minibridge backend for agent identification")
+	fFrontend.StringP("agent-token", "t", "", "The user token to pass inline to the minibridge backend to identify the agent that will be passed to the policer. You must use sse server by setting --listen and configure tls for communications with minibridghe backend")
+	fFrontend.BoolP("agent-token-passthrough", "b", false, "If set, the HTTP Authorization header of the incoming agent request will be forwarded as-is to the minibridge backend for agent identification")
 
 	Frontend.Flags().AddFlagSet(fFrontend)
 	Frontend.Flags().AddFlagSet(fTLSClient)

@@ -149,7 +149,6 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	rc := http.NewResponseController(w)
 
-	// TODO: SECURITY parse url and stuff correctly here.
 	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, sid); err != nil {
 		log.Error("Unable to send endpoint event", err)
 		return

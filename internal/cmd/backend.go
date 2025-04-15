@@ -17,7 +17,7 @@ func init() {
 
 	initSharedFlagSet()
 
-	fBackend.String("listen", ":8000", "Listen address of the bridge for incoming connections")
+	fBackend.StringP("listen", "l", ":8000", "Listen address of the bridge for incoming connections")
 
 	Backend.Flags().AddFlagSet(fBackend)
 	Backend.Flags().AddFlagSet(fPolicer)
