@@ -16,10 +16,11 @@ func main() {
 		cmd.Backend,
 		cmd.Frontend,
 		cmd.AIO,
+		cmd.Completion,
 	)
 
 	if err := cmd.Root.Execute(); err != nil {
-		slog.Error("Minibridge exited with error", err)
+		slog.Error("Minibridge exited with error", "err", err)
 		os.Exit(1)
 	}
 }
