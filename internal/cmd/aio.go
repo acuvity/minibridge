@@ -149,6 +149,7 @@ var AIO = &cobra.Command{
 					"agent-token", agentToken != "",
 					"mode", "sse",
 					"server-tls", frontendServerTLSConfig != nil,
+					"server-mtls", frontendServerTLSConfig.ClientAuth.String(),
 					"client-tls", frontendClientTLSConfig != nil,
 					"listen", listen,
 				)

@@ -75,6 +75,7 @@ var Backend = &cobra.Command{
 		slog.Info("Minibridge backend configured",
 			"policer", policerURL,
 			"server-tls", backendTLSConfig != nil,
+			"server-mtls", backendTLSConfig.ClientAuth.String(),
 			"listen", listen,
 		)
 

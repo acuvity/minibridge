@@ -87,6 +87,7 @@ var Frontend = &cobra.Command{
 				"messages", messageEndpoint,
 				"mode", "sse",
 				"server-tls", serverTLSConfig != nil,
+				"server-mtls", serverTLSConfig.ClientAuth.String(),
 				"client-tls", clientTLSConfig != nil,
 				"listen", listen,
 			)
