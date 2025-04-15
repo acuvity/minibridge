@@ -24,7 +24,6 @@ func init() {
 	Backend.Flags().AddFlagSet(fTLSServer)
 	Backend.Flags().AddFlagSet(fHealth)
 	Backend.Flags().AddFlagSet(fProfiler)
-	Backend.Flags().AddFlagSet(fJWTVerifier)
 	Backend.Flags().AddFlagSet(fCORS)
 }
 
@@ -44,12 +43,6 @@ var Backend = &cobra.Command{
 
 		if listen == "" {
 			return fmt.Errorf("--listen must be set")
-		}
-
-		jwtVerifierConfig := jwtVerifierConfigFromFlags()
-		jwks, err := makeJWKS(cmd.Context(), jwtVerifierConfig)
-		if err != nil {
-			return err
 		}
 
 		backendTLSConfig, err := tlsConfigFromFlags(fTLSServer)
@@ -75,14 +68,13 @@ var Backend = &cobra.Command{
 		slog.Info("Minibridge backend configured",
 			"policer", policerURL,
 			"server-tls", backendTLSConfig != nil,
-			"server-mtls", backendTLSConfig.ClientAuth.String(),
+			"server-mtls", mtlsMode(backendTLSConfig),
 			"listen", listen,
 		)
 
 		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,
 			backend.OptWSPolicer(policer),
 			backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
-			backend.OptWSAuth(jwks, jwtVerifierConfig.principalClaim, jwtVerifierConfig.reqIss, jwtVerifierConfig.reqAud),
 			backend.OptWSCORSPolicy(corsPolicy),
 		)
 

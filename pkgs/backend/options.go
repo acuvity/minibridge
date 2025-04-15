@@ -1,19 +1,14 @@
 package backend
 
 import (
-	"go.acuvity.ai/a3s/pkgs/token"
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 )
 
 type wsCfg struct {
-	policer            policer.Policer
-	dumpStderr         bool
-	jwtJWKS            *token.JWKS
-	jwtRequiredIss     string
-	jwtRequiredAud     string
-	jwtPrincipalClaims string
-	corsPolicy         *bahamut.CORSPolicy
+	policer    policer.Policer
+	dumpStderr bool
+	corsPolicy *bahamut.CORSPolicy
 }
 
 func newWSCfg() wsCfg {
@@ -35,16 +30,6 @@ func OptWSPolicer(policer policer.Policer) OptWS {
 func OptWSDumpStderrOnError(dump bool) OptWS {
 	return func(cfg *wsCfg) {
 		cfg.dumpStderr = dump
-	}
-}
-
-// OptWSAuth configures the needed information to enable authentication.
-func OptWSAuth(jwks *token.JWKS, principalClaim string, requiredIssuer string, requiredAudience string) OptWS {
-	return func(cfg *wsCfg) {
-		cfg.jwtJWKS = jwks
-		cfg.jwtRequiredIss = requiredIssuer
-		cfg.jwtRequiredAud = requiredAudience
-		cfg.jwtPrincipalClaims = principalClaim
 	}
 }
 

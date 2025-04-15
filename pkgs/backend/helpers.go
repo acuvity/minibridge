@@ -1,22 +1,29 @@
 package backend
 
 import (
-	"fmt"
+	"log/slog"
 
 	"go.acuvity.ai/elemental"
+	"go.acuvity.ai/minibridge/pkgs/policer/api"
 )
 
-func makeMCPError(data []byte, err error) []byte {
+func makeMCPError(ID any, err error) []byte {
 
-	s := struct {
-		ID any `json:"id"`
-	}{}
-	_ = elemental.Decode(elemental.EncodingTypeJSON, data, &s)
-
-	switch s.ID.(type) {
-	case string:
-		return fmt.Appendf([]byte{}, `{"jsonrpc":"2.0","id":"%s","error":{"code":451,"message":"%s"}}`, s.ID, err.Error())
-	default:
-		return fmt.Appendf([]byte{}, `{"jsonrpc":"2.0","id":%d,"error":{"code":451,"message":"%s"}}`, s.ID, err.Error())
+	mpcerr := api.MCPCall{
+		JSONRPC: "2.0",
+		ID:      ID,
+		Error: &api.MCPError{
+			Code:    451,
+			Message: err.Error(),
+		},
 	}
+
+	data, err := elemental.Encode(elemental.EncodingTypeJSON, mpcerr)
+	if err != nil {
+		panic(err)
+	}
+
+	slog.Error("Injecting MCP error", "err", string(data))
+
+	return append(data, '\n')
 }

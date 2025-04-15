@@ -25,9 +25,12 @@ version 2024-11-05. Support for version 2025-03-26 is in progress.
 * [Frontend](#frontend)
   * [Stdio](#stdio)
   * [HTTP+SSE](#httpsse)
-* [Policer and Authentication](#policer-and-authentication)
-  * [Policer](#policer)
-  * [Authentication](#authentication)
+* [Policer](#policer)
+  * [Police Request API](#police-request-api)
+  * [Police Response API](#police-response-api)
+  * [Agent Authentication](#agent-authentication)
+    * [Global](#global)
+    * [Forward](#forward)
 * [Todos](#todos)
 
 <!-- vim-markdown-toc -->
@@ -213,22 +216,23 @@ You can now connect directly using an HTTP client:
       -X POST \
       -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 
-## Policer and Authentication
+## Policer
 
 While Minibridge already offers advanced features such as strong client
 authentication and native WebSocket support, it can be further enhanced through
 integration with a Policer. A Policer is responsible for:
 
+* Authentication
 * Authorization
 * Input analysis and logging
 * Full request tracing
 * And more advanced policy-based controls
 
-### Policer
-
 The Policer, if set, will be called and passed various information so it can
 make a decision on what to do with the request, based on the user who initiated
 the request and the content of the request.
+
+> NOTE: You can find an example of a policer in `policers/example`.
 
 You can then start Minibridge, using either the aio or backend subcommand, with
 the following arguments:
@@ -239,22 +243,30 @@ Once integrated, any command from the user or response from the MCP Server
 received by the backend is first passed to the Policer for authentication and/or
 analysis.
 
+### Police Request API
+
 The Policer receives a `POST` request at the `--policer-url` endpoint in the
 following format:
 
 ```json
 {
-  "type":"Input"
-  "messages": ["{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}"],
-  "user": {
-    "name": "joe",
-    "claims": ["email=joe@acme.com", "group=mcp-users"]
+  "type": "input"
+  "token": "<agent-token>",
+  "mcp": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/list",
   }
 }
 ```
 
-> NOTE: for a response from the MCP Server, the `type` will be set to `Output`
+> NOTE: for a response from the MCP Server, the `type` will be set to `output`
 and no user will be passed.
+
+> NOTE: minibrige `--policer-token` will be passed in the `Authorization`
+> header of the POST request made to the policer.
+
+### Police Response API
 
 The Policer must respond with an HTTP status code `200 OK` if the request passes
 the policy checks. Any other status code will be treated as a failure, and the
@@ -264,7 +276,7 @@ For a policy decision that permits the request:
 
 ```json
 {
-  "decision": "Allow"
+  "decision": "allow"
 }
 ```
 
@@ -272,7 +284,7 @@ For a policy result that denies the request:
 
 ```json
 {
-  "decision": "Deny",
+  "decision": "deny",
   "reasons": ["You are not allowed to list the tools"]
 }
 ```
@@ -286,44 +298,29 @@ Example:
     $ mcptools tools http://127.0.0.1:8000
     error: RPC error 451: request blocked: ForbiddenUser: You are not allowed to list the tools
 
-### Authentication
+### Agent Authentication
 
-In order for the policer to identify a particular user (instead of using the
-identity contained into `--policer-token`), Minibridge supports JWT verification
-and information extraction.
+The frontend can forward the agent credentials using two modes.
 
-To start minibridge with auth enabled:
+#### Global
 
-    minibridge backend \
-      --policer-url https://policer.acme.com/police --policer-token $PTOKEN \
-      --auth-jwks-url https://myidp.com/.well-known/jwks.json \
-      --auth-jwt-principal-claim email
+This mode uses a single token set during the Minibridge frontend startup. It is
+useful when there is only one user of the bridge — such as when it is running on a
+user’s laptop and connecting to a remote Minibridge backend.
 
-This makes the backend (or AIO backend) requires clients to pass a JWT signed by
-a key contained in the JWKS available at
-`https://myidp.com/.well-known/jwks.json`.
+To start the frontend in that mode:
 
-Instead of a JWKS, you can use local certificates contained into a PEM file by
-passing `--auth-jwt-cert ./jwt.pem` instead of setting `--auth-jwks-url`.
+    minibridge frontend -l :8000 -A wss://backend.minibridge.acme.com/ws --agent-token "$TOKEN"
 
-You can also require a specific issuer and audience with the flags
-`--auth-jwt-required-issuer` and `--auth-jwt-required-audience`
+#### Forward
 
-The principal claim is used to extract a particular key from the JWT's
-`identity` property and use it as the principal name when sending policing
-request to the policer.
+This mode simply forwards the HTTP `Authorization` header to the Minibridge
+backend. It is useful when the frontend runs on a public network and you want
+the policer to authenticate multiple callers.
 
-Now that the backend requires a JWT, you have 2 options for the frontend to
-forward the user JWT:
+To start the frontend in that mode:
 
-* Either you set a global token for the frontend using the flag `--agent-token`:
-
-      minibridge frontend -l :8001 --agent-token $TOKEN
-
-* Or you forward the incoming `Authorization` header as-is to the backend with
-`--agent-token-passthrough`:
-
-      minibridge frontend -l :8001 --agent-token-passthrough
+    minibridge frontend -l :8000 -A wss://backend.minibridge.acme.com/ws --agent-token-passthrough
 
 ## Todos
 
@@ -334,4 +331,3 @@ Minibridge is still missing the following features:
 - [x] Support for user extraction to pass to the policer
 - [ ] Optimize communications between front/back in aio mode
 - [ ] Plug in prometheus metrics
-- [ ] Support connecting to an MCP server using HTTP

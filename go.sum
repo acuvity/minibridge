@@ -60,8 +60,6 @@ github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHk
 github.com/frankban/quicktest v1.14.6/go.mod h1:4ptaffx2x8+WTWXmUCuVU6aPUX1/Mz7zb5vbUoiM6w0=
 github.com/fsnotify/fsnotify v1.8.0 h1:dAwr6QBTBZIkG8roQaJjGof0pp0EeF+tNV7YBP3F/8M=
 github.com/fsnotify/fsnotify v1.8.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
-github.com/ghodss/yaml v1.0.0 h1:wQHKEahhL6wmXdzwWG11gIVCkOv05bNOh+Rxn0yngAk=
-github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/gliderlabs/ssh v0.3.8 h1:a4YXD1V7xMF9g5nTkdfnja3Sxy1PVDCj1Zg4Wb8vY6c=
 github.com/gliderlabs/ssh v0.3.8/go.mod h1:xYoytBv1sV0aL3CavoDuJIQNURXkkfPA/wxQ1pL1fAU=
 github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 h1:DujepqpGd1hyOd7aW59XpK7Qymp8iy83xq74fLr21is=
@@ -275,8 +273,6 @@ github.com/yusufpapurcu/wmi v1.2.4 h1:zFUKzehAFReQwLys1b/iSMl+JQGSCSjtVqQn9bBrPo
 github.com/yusufpapurcu/wmi v1.2.4/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQmPyzfmi0=
 go.acuvity.ai/a3s v0.0.0-20250331211316-39bc5ec90f85 h1:nwOIqKUKNPOs/w9dQnJGSnLTefhqyYWi/pMJP9vmgKQ=
 go.acuvity.ai/a3s v0.0.0-20250331211316-39bc5ec90f85/go.mod h1:74v70zxHTVuh3j0q3KB22pO5U4xURsHA+5LFwA3Njok=
-go.acuvity.ai/api v0.0.5 h1:zE+MpvRbGgtiB3EhM+D+0dnLxmn0qjYxeDTqB6uHc/Y=
-go.acuvity.ai/api v0.0.5/go.mod h1:rkKys5n1cOBmQlPuQc9i8jkY4hE/rEecWxeLFu67KpY=
 go.acuvity.ai/bahamut v0.0.0-20250226152621-d4dd109ed78a h1:cx4KO0NBv/rWCVaBOmKoZ8u/UzWGz0Hmt72CNMi8KWs=
 go.acuvity.ai/bahamut v0.0.0-20250226152621-d4dd109ed78a/go.mod h1:btpwoWi/nDsuM83Ev5gU/TCBS/WV8Gt9AU0TZSWeffA=
 go.acuvity.ai/elemental v0.0.0-20250226152430-c139902eba00 h1:juUUn54tyhwvwb08RroIYM/eoCXa3ET109Cf7HLmJ/I=

@@ -36,7 +36,6 @@ func init() {
 	AIO.Flags().AddFlagSet(fTLSServer)
 	AIO.Flags().AddFlagSet(fHealth)
 	AIO.Flags().AddFlagSet(fProfiler)
-	AIO.Flags().AddFlagSet(fJWTVerifier)
 	AIO.Flags().AddFlagSet(fCORS)
 	AIO.Flags().AddFlagSet(fAgentAuth)
 }
@@ -49,7 +48,7 @@ var AIO = &cobra.Command{
 	SilenceErrors:    true,
 	TraverseChildren: true,
 
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
@@ -66,12 +65,6 @@ var AIO = &cobra.Command{
 			slog.Info("Agent authentication enabled",
 				"token", agentToken != "",
 			)
-		}
-
-		jwtVConfig := jwtVerifierConfigFromFlags()
-		jwks, err := makeJWKS(cmd.Context(), jwtVConfig)
-		if err != nil {
-			return err
 		}
 
 		backendTLSConfig, trustPool, err := makeTempTLSConfig()
@@ -124,7 +117,6 @@ var AIO = &cobra.Command{
 			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
 				backend.OptWSPolicer(policer),
 				backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
-				backend.OptWSAuth(jwks, jwtVConfig.principalClaim, jwtVConfig.reqIss, jwtVConfig.reqAud),
 			)
 
 			return proxy.Start(ctx)
@@ -149,7 +141,7 @@ var AIO = &cobra.Command{
 					"agent-token", agentToken != "",
 					"mode", "sse",
 					"server-tls", frontendServerTLSConfig != nil,
-					"server-mtls", frontendServerTLSConfig.ClientAuth.String(),
+					"server-mtls", mtlsMode(frontendServerTLSConfig),
 					"client-tls", frontendClientTLSConfig != nil,
 					"listen", listen,
 				)

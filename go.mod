@@ -4,7 +4,6 @@ go 1.24.1
 
 require (
 	go.acuvity.ai/a3s v0.0.0-20250331211316-39bc5ec90f85
-	go.acuvity.ai/api v0.0.5
 	go.acuvity.ai/bahamut v0.0.0-20250226152621-d4dd109ed78a
 	go.acuvity.ai/elemental v0.0.0-20250226152430-c139902eba00
 	go.acuvity.ai/manipulate v0.0.0-20250331211103-13b505fe3e16 // indirect
@@ -44,7 +43,6 @@ require (
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
-	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.6.1 // indirect

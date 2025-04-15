@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"strings"
 
-	api "go.acuvity.ai/api/apex"
 	"go.acuvity.ai/elemental"
+	"go.acuvity.ai/minibridge/pkgs/policer/api"
 )
 
 var ErrBlocked = errors.New("request blocked")
@@ -36,20 +36,9 @@ func New(endpoint string, token string, tlsConfig *tls.Config) Policer {
 	}
 }
 
-func (p *policer) Police(ctx context.Context, rtype api.PoliceRequestTypeValue, data []byte, user User) error {
+func (p *policer) Police(ctx context.Context, preq api.Request) error {
 
-	sreq := api.NewPoliceRequest()
-	sreq.Type = rtype
-	sreq.Messages = []string{strings.TrimSpace(string(data))}
-
-	if user.Name != "" || len(user.Claims) > 0 {
-		sreq.User = &api.PoliceExternalUser{
-			Name:   user.Name,
-			Claims: user.Claims,
-		}
-	}
-
-	body, err := elemental.Encode(elemental.EncodingTypeJSON, sreq)
+	body, err := elemental.Encode(elemental.EncodingTypeJSON, preq)
 	if err != nil {
 		return fmt.Errorf("unable to encode scan request: %w", err)
 	}
@@ -78,12 +67,12 @@ func (p *policer) Police(ctx context.Context, rtype api.PoliceRequestTypeValue, 
 		return fmt.Errorf("invalid response from policer `%s`: %s", string(rbody), resp.Status)
 	}
 
-	sresp := api.NewScanResponse()
-	if err := elemental.Decode(elemental.EncodingTypeJSON, rbody, sresp); err != nil {
+	sresp := api.Response{}
+	if err := elemental.Decode(elemental.EncodingTypeJSON, rbody, &sresp); err != nil {
 		return fmt.Errorf("unable to decode response body: %w", err)
 	}
 
-	if sresp.Decision != api.ScanResponseDecisionAllow {
+	if sresp.Decision != api.DecisionAllow {
 		return fmt.Errorf("%w: %s: %s", ErrBlocked, sresp.Decision, strings.Join(sresp.Reasons, ", "))
 	}
 

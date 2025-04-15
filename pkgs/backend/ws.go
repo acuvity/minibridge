@@ -16,12 +16,11 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/smallnest/ringbuffer"
-	"go.acuvity.ai/a3s/pkgs/claims"
-	"go.acuvity.ai/a3s/pkgs/token"
-	api "go.acuvity.ai/api/apex"
+	"go.acuvity.ai/elemental"
 	"go.acuvity.ai/minibridge/pkgs/client"
 	"go.acuvity.ai/minibridge/pkgs/cors"
 	"go.acuvity.ai/minibridge/pkgs/policer"
+	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/wsc"
 )
 
@@ -117,19 +116,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	tokenString, ok := parseBasicAuth(req.Header.Get("Authorization"))
-	if (!ok || tokenString == "") && p.cfg.jwtJWKS != nil {
-		slog.Error("Authentication invalid", "reason", "no token provided")
-		http.Error(w, "Unauthenticated", http.StatusUnauthorized)
-		return
-	}
-
-	user, err := authenticate(tokenString, p.cfg.jwtJWKS, p.cfg.jwtRequiredIss, p.cfg.jwtRequiredAud, p.cfg.jwtPrincipalClaims)
-	if err != nil {
-		slog.Error("Authentication rejected", err)
-		http.Error(w, fmt.Sprintf("Invalid JWT: %s", err), http.StatusUnauthorized)
-		return
-	}
+	agentToken, _ := parseBasicAuth(req.Header.Get("Authorization"))
 
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
@@ -164,9 +151,16 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 
 			if pol := p.cfg.policer; pol != nil {
-				if err := pol.Police(req.Context(), api.PoliceRequestTypeInput, data, user); err != nil {
+
+				call := api.MCPCall{}
+				if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
+					slog.Error("Unable to decode mcp call", err)
+					continue
+				}
+
+				if err := pol.Police(req.Context(), api.Request{Type: api.Input, Token: agentToken, MCP: call}); err != nil {
 					if errors.Is(err, policer.ErrBlocked) {
-						stream.Stdout <- makeMCPError(data, err)
+						session.Write(makeMCPError(call.ID, err))
 						continue
 					}
 					slog.Error("Unable to run input analysis", err)
@@ -181,9 +175,16 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			slog.Debug("Received data from MCP Server", "msg", string(data))
 
 			if pol := p.cfg.policer; pol != nil {
-				if err := pol.Police(req.Context(), api.PoliceRequestTypeOutput, data, user); err != nil {
+
+				call := api.MCPCall{}
+				if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
+					slog.Error("Unable to decode mcp call", err)
+					continue
+				}
+
+				if err := pol.Police(req.Context(), api.Request{Type: api.Output, Token: agentToken, MCP: call}); err != nil {
 					if errors.Is(err, policer.ErrBlocked) {
-						stream.Stdout <- makeMCPError(data, err)
+						session.Write(makeMCPError(call.ID, err))
 						continue
 					}
 					slog.Error("Unable to run output analysis", err)
@@ -244,35 +245,4 @@ func parseBasicAuth(auth string) (password string, ok bool) {
 		return "", false
 	}
 	return password, true
-}
-
-func authenticate(tokenString string, jwks *token.JWKS, reqIss string, reqAud string, pClaim string) (policer.User, error) {
-
-	user := policer.User{}
-
-	if tokenString == "" || jwks == nil {
-		return user, nil
-	}
-
-	idt, err := token.Parse(tokenString, jwks, reqIss, reqAud)
-	if err != nil {
-		return user, fmt.Errorf("unable to parse token: %w", err)
-	}
-
-	cmap, err := claims.ToMap(idt.Identity)
-	if err != nil {
-		return user, fmt.Errorf("unable to parse token claims: %w", err)
-	}
-
-	pclaims := cmap[pClaim]
-	if len(pclaims) == 0 {
-		return user, fmt.Errorf("missing principal claim")
-	}
-
-	user.Claims = idt.Identity
-	user.Name = pclaims[0]
-
-	slog.Debug("Authenticated agent", "name", user.Name, "claims", user.Claims)
-
-	return user, nil
 }

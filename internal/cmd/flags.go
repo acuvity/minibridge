@@ -5,14 +5,13 @@ import (
 )
 
 var (
-	fTLSClient   = pflag.NewFlagSet("tlsclient", pflag.ExitOnError)
-	fTLSServer   = pflag.NewFlagSet("tlsserver", pflag.ExitOnError)
-	fProfiler    = pflag.NewFlagSet("profile", pflag.ExitOnError)
-	fHealth      = pflag.NewFlagSet("health", pflag.ExitOnError)
-	fPolicer     = pflag.NewFlagSet("police", pflag.ExitOnError)
-	fJWTVerifier = pflag.NewFlagSet("jwtverifier", pflag.ExitOnError)
-	fCORS        = pflag.NewFlagSet("cors", pflag.ExitOnError)
-	fAgentAuth   = pflag.NewFlagSet("agentauth", pflag.ExitOnError)
+	fTLSClient = pflag.NewFlagSet("tlsclient", pflag.ExitOnError)
+	fTLSServer = pflag.NewFlagSet("tlsserver", pflag.ExitOnError)
+	fProfiler  = pflag.NewFlagSet("profile", pflag.ExitOnError)
+	fHealth    = pflag.NewFlagSet("health", pflag.ExitOnError)
+	fPolicer   = pflag.NewFlagSet("police", pflag.ExitOnError)
+	fCORS      = pflag.NewFlagSet("cors", pflag.ExitOnError)
+	fAgentAuth = pflag.NewFlagSet("agentauth", pflag.ExitOnError)
 
 	initialized = false
 )
@@ -46,14 +45,6 @@ func initSharedFlagSet() {
 	fPolicer.StringP("policer-token", "T", "", "token to use to authenticate against the policer.")
 	fPolicer.String("policer-ca", "", "path to a CA to validate the policer server certificates.")
 	fPolicer.Bool("policer-insecure-skip-verify", false, "skip policer's server certificates validation. INSECURE.")
-
-	fJWTVerifier.StringP("auth-jwks-url", "J", "", "enables authentication and requires agent to send JWTs signed by the given JWKS.")
-	fJWTVerifier.String("auth-jwks-ca", "", "path to a CA to validate the JWKS server certificates.")
-	fJWTVerifier.String("auth-jwt-cert", "", "enables authentication and requires agent to send JWTs signed by the given certificates.")
-	fJWTVerifier.StringP("auth-jwt-required-issuer", "I", "", "when auth is enabled, sets the required JWTs issuer.")
-	fJWTVerifier.StringP("auth-jwt-required-audience", "A", "", "when auth is enabled, sets the required JWTs audience.")
-	fJWTVerifier.StringP("auth-jwt-principal-claim", "S", "", "when auth is enabled, sets the identity claim to use as the principal name to send to the policer.")
-	fJWTVerifier.Bool("auth-jwks-insecure-skip-verify", false, "skip JWKS's server certificate validation. INSECURE.")
 
 	fCORS.String("cors-origin", "*", "sets the valid HTTP Origin for CORS responses.")
 

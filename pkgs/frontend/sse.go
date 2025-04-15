@@ -185,6 +185,7 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 				log.Error("Unable to write event", err)
 				continue
 			}
+
 			if err := rc.Flush(); err != nil {
 				log.Error("Unable to flush remote event", err)
 				continue
