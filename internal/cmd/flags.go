@@ -28,13 +28,13 @@ func initSharedFlagSet() {
 	fTLSServer.StringP("tls-server-cert", "c", "", "path to the server certificate for incoming HTTPS connections.")
 	fTLSServer.StringP("tls-server-key", "k", "", "path to the key for the server certificate.")
 	fTLSServer.StringP("tls-server-key-pass", "p", "", "passphrase for the server certificate key.")
-	fTLSServer.String("tls-server-client-ca", "", "path to a CA to validate incoming client certificate. When enabled clients must send a valid certificate.")
+	fTLSServer.String("tls-server-client-ca", "", "path to a CA to require and validate incoming client certificates.")
 
 	fTLSClient.StringP("tls-client-cert", "C", "", "path to the client certificate to authenticate against the minibridge backend.")
 	fTLSClient.StringP("tls-client-key", "K", "", "path to the key for the client certificate.")
 	fTLSClient.StringP("tls-client-key-pass", "P", "", "passphrase for the client certificate key.")
 	fTLSClient.String("tls-client-backend-ca", "", "path to a CA to validate the minibridge backend server certificates.")
-	fTLSClient.Bool("tls-client-insecure-skip-verify", false, "skip backend's server certificates validation. Do not do this.")
+	fTLSClient.Bool("tls-client-insecure-skip-verify", false, "skip backend's server certificates validation. INSECURE.")
 
 	fHealth.String("health-listen", ":8080", "listen address of the health server.")
 	fHealth.Bool("health-enable", false, "enables health server.")
@@ -45,7 +45,7 @@ func initSharedFlagSet() {
 	fPolicer.StringP("policer-url", "U", "", "URL of the policer to POST agent policing requests.")
 	fPolicer.StringP("policer-token", "T", "", "token to use to authenticate against the policer.")
 	fPolicer.String("policer-ca", "", "path to a CA to validate the policer server certificates.")
-	fPolicer.Bool("policer-insecure-skip-verify", false, "skip policer's server certificates validation. Do not do this.")
+	fPolicer.Bool("policer-insecure-skip-verify", false, "skip policer's server certificates validation. INSECURE.")
 
 	fJWTVerifier.StringP("auth-jwks-url", "J", "", "enables authentication and requires agent to send JWTs signed by the given JWKS.")
 	fJWTVerifier.String("auth-jwks-ca", "", "path to a CA to validate the JWKS server certificates.")
@@ -53,7 +53,7 @@ func initSharedFlagSet() {
 	fJWTVerifier.StringP("auth-jwt-required-issuer", "I", "", "when auth is enabled, sets the required JWTs issuer.")
 	fJWTVerifier.StringP("auth-jwt-required-audience", "A", "", "when auth is enabled, sets the required JWTs audience.")
 	fJWTVerifier.StringP("auth-jwt-principal-claim", "S", "", "when auth is enabled, sets the identity claim to use as the principal name to send to the policer.")
-	fJWTVerifier.Bool("auth-jwks-insecure-skip-verify", false, "skip JWKS's server certificate validation. Don't do this.")
+	fJWTVerifier.Bool("auth-jwks-insecure-skip-verify", false, "skip JWKS's server certificate validation. INSECURE.")
 
 	fCORS.String("cors-origin", "*", "sets the valid HTTP Origin for CORS responses.")
 
