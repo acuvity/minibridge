@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/spf13/cobra"
@@ -15,12 +16,11 @@ func init() {
 
 	initSharedFlagSet()
 
-	fFrontend.StringP("listen", "l", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
-	fFrontend.StringP("backend", "A", "", "Address of the minibridge backend")
-	fFrontend.String("endpoint-messages", "/message", "When using HTTP, sets the endpoint to post messages")
-	fFrontend.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
-	fFrontend.StringP("agent-token", "t", "", "The user token to pass inline to the minibridge backend to identify the agent that will be passed to the policer. You must use sse server by setting --listen and configure tls for communications with minibridghe backend")
-	fFrontend.BoolP("agent-token-passthrough", "b", false, "If set, the HTTP Authorization header of the incoming agent request will be forwarded as-is to the minibridge backend for agent identification")
+	fFrontend.StringP("listen", "l", "", "listen address of the bridge for incoming connections. If this is unset, stdio is used.")
+	fFrontend.StringP("backend", "A", "", "URL of the minibridge backend to connect to.")
+	fFrontend.String("endpoint-messages", "/message", "when using HTTP, sets the endpoint to post messages.")
+	fFrontend.String("endpoint-sse", "/sse", "when using HTTP, sets the endpoint to connect to the event stream.")
+	fFrontend.BoolP("agent-token-passthrough", "b", false, "forwards incoming HTTP Authorization header to the minibridge backend as-is.")
 
 	Frontend.Flags().AddFlagSet(fFrontend)
 	Frontend.Flags().AddFlagSet(fTLSClient)
@@ -28,12 +28,13 @@ func init() {
 	Frontend.Flags().AddFlagSet(fHealth)
 	Frontend.Flags().AddFlagSet(fProfiler)
 	Frontend.Flags().AddFlagSet(fCORS)
+	Frontend.Flags().AddFlagSet(fAgentAuth)
 }
 
 // Frontend is the cobra command to run the client.
 var Frontend = &cobra.Command{
 	Use:              "frontend",
-	Short:            "Start a secure frontend bridge to minibridge backend",
+	Short:            "Start a minibridge frontend to connect to a minibridge backend",
 	SilenceUsage:     true,
 	SilenceErrors:    true,
 	TraverseChildren: true,
@@ -47,10 +48,18 @@ var Frontend = &cobra.Command{
 		agentToken := viper.GetString("agent-token")
 		agentTokenPassthrough := viper.GetBool("agent-token-passthrough")
 
+		if listen == "" {
+			return fmt.Errorf("--listen must be set")
+		}
+
+		if backendURL == "" {
+			return fmt.Errorf("--backend must be set")
+		}
+
 		if agentToken != "" || agentTokenPassthrough {
-			slog.Info("Agent authentication enabled",
-				"token", agentToken != "",
-				"passthrough", agentTokenPassthrough,
+			slog.Info("Agent authentication configured",
+				"agent-token", agentToken != "",
+				"agent-token-passthrough", agentTokenPassthrough,
 			)
 		}
 
@@ -72,15 +81,14 @@ var Frontend = &cobra.Command{
 				return err
 			}
 
-			slog.Info("Starting frontend",
-				"mode", "sse",
-				"tls", serverTLSConfig != nil,
+			slog.Info("Minibridge frontend configured",
 				"backend", backendURL,
-				"listen", listen,
 				"sse", sseEndpoint,
 				"messages", messageEndpoint,
-				"agent-token", agentToken != "",
-				"agent-token-passthrough", agentTokenPassthrough,
+				"mode", "sse",
+				"server-tls", serverTLSConfig != nil,
+				"client-tls", clientTLSConfig != nil,
+				"listen", listen,
 			)
 
 			proxy = frontend.NewSSE(listen, backendURL, serverTLSConfig, clientTLSConfig,
@@ -93,9 +101,9 @@ var Frontend = &cobra.Command{
 
 		} else {
 
-			slog.Info("Starting frontend",
-				"mode", "stdio",
+			slog.Info("Minibridge frontend configured",
 				"backend", backendURL,
+				"mode", "stdio",
 			)
 
 			proxy = frontend.NewStdio(backendURL, clientTLSConfig,

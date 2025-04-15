@@ -17,7 +17,7 @@ func init() {
 
 	initSharedFlagSet()
 
-	fBackend.StringP("listen", "l", ":8000", "Listen address of the bridge for incoming connections")
+	fBackend.StringP("listen", "l", ":8000", "listen address of the bridge for incoming websocket connections.")
 
 	Backend.Flags().AddFlagSet(fBackend)
 	Backend.Flags().AddFlagSet(fPolicer)
@@ -31,7 +31,7 @@ func init() {
 // Backend is the cobra command to run the server.
 var Backend = &cobra.Command{
 	Use:              "backend [flags] -- command [args...]",
-	Short:            "Start a minibridge backend for an MCP server",
+	Short:            "Start a minibridge backend to expose an MCP server",
 	SilenceUsage:     true,
 	SilenceErrors:    true,
 	TraverseChildren: true,
@@ -41,6 +41,10 @@ var Backend = &cobra.Command{
 
 		listen := viper.GetString("listen")
 		policerURL := viper.GetString("policer-url")
+
+		if listen == "" {
+			return fmt.Errorf("--listen must be set")
+		}
 
 		jwtVerifierConfig := jwtVerifierConfigFromFlags()
 		jwks, err := makeJWKS(cmd.Context(), jwtVerifierConfig)
@@ -63,14 +67,15 @@ var Backend = &cobra.Command{
 		startHelperServers(cmd.Context())
 
 		mcpServer := client.MCPServer{Command: args[0], Args: args[1:]}
-
-		slog.Info("Backend configured",
-			"mode", "ws",
+		slog.Info("MCP server configured",
 			"command", mcpServer.Command,
 			"args", mcpServer.Args,
-			"tls", backendTLSConfig != nil,
-			"listen", listen,
+		)
+
+		slog.Info("Minibridge backend configured",
 			"policer", policerURL,
+			"server-tls", backendTLSConfig != nil,
+			"listen", listen,
 		)
 
 		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,

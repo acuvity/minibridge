@@ -12,6 +12,7 @@ var (
 	fPolicer     = pflag.NewFlagSet("police", pflag.ExitOnError)
 	fJWTVerifier = pflag.NewFlagSet("jwtverifier", pflag.ExitOnError)
 	fCORS        = pflag.NewFlagSet("cors", pflag.ExitOnError)
+	fAgentAuth   = pflag.NewFlagSet("agentauth", pflag.ExitOnError)
 
 	initialized = false
 )
@@ -24,35 +25,37 @@ func initSharedFlagSet() {
 
 	initialized = true
 
-	fTLSServer.StringP("tls-server-cert", "c", "", "Path to the server certificate")
-	fTLSServer.StringP("tls-server-key", "k", "", "Path to the key for the certificate")
-	fTLSServer.StringP("tls-server-key-pass", "p", "", "Passphrase for the key")
-	fTLSServer.String("tls-server-client-ca", "", "Path to a CA to validate client connections")
+	fTLSServer.StringP("tls-server-cert", "c", "", "path to the server certificate for incoming HTTPS connections.")
+	fTLSServer.StringP("tls-server-key", "k", "", "path to the key for the server certificate.")
+	fTLSServer.StringP("tls-server-key-pass", "p", "", "passphrase for the server certificate key.")
+	fTLSServer.String("tls-server-client-ca", "", "path to a CA to validate incoming client certificate. When enabled clients must send a valid certificate.")
 
-	fTLSClient.StringP("tls-client-cert", "C", "", "Path to the client certificate")
-	fTLSClient.StringP("tls-client-key", "K", "", "Path to the key for the certificate")
-	fTLSClient.StringP("tls-client-key-pass", "P", "", "Passphrase for the key")
-	fTLSClient.String("tls-client-server-ca", "", "Path to a CA to validate server connections")
-	fTLSClient.Bool("tls-client-insecure-skip-verify", false, "If set, don't validate server's CA. Do not do this.")
+	fTLSClient.StringP("tls-client-cert", "C", "", "path to the client certificate to authenticate against the minibridge backend.")
+	fTLSClient.StringP("tls-client-key", "K", "", "path to the key for the client certificate.")
+	fTLSClient.StringP("tls-client-key-pass", "P", "", "passphrase for the client certificate key.")
+	fTLSClient.String("tls-client-backend-ca", "", "path to a CA to validate the minibridge backend server certificates.")
+	fTLSClient.Bool("tls-client-insecure-skip-verify", false, "skip backend's server certificates validation. Do not do this.")
 
-	fHealth.String("health-listen", ":8080", "Listen address of the health server")
-	fHealth.Bool("health-enable", false, "If set, start a health server for production deployments")
+	fHealth.String("health-listen", ":8080", "listen address of the health server.")
+	fHealth.Bool("health-enable", false, "enables health server.")
 
-	fProfiler.String("profiling-listen", ":6060", "Listen address of the health server")
-	fProfiler.Bool("profiling-enable", false, "If set, enable profiling server")
+	fProfiler.String("profiling-listen", ":6060", "listen address of the health server.")
+	fProfiler.Bool("profiling-enable", false, "enables profiling server.")
 
-	fPolicer.StringP("policer-url", "U", "", "Address of a Policer to send the traffic to for authentication and/or analysis")
-	fPolicer.StringP("policer-token", "T", "", "Token to use to authenticate against the Policer")
-	fPolicer.String("policer-ca", "", "CA to trust Policer server certificates")
-	fPolicer.String("policer-insecure-skip-verify", "", "Do not validate Policer CA. Do not do this")
+	fPolicer.StringP("policer-url", "U", "", "URL of the policer to POST agent policing requests.")
+	fPolicer.StringP("policer-token", "T", "", "token to use to authenticate against the policer.")
+	fPolicer.String("policer-ca", "", "path to a CA to validate the policer server certificates.")
+	fPolicer.Bool("policer-insecure-skip-verify", false, "skip policer's server certificates validation. Do not do this.")
 
-	fJWTVerifier.StringP("auth-jwks-url", "J", "", "If set, enables authentication and require JWT signed by a certificate in the given JWKS")
-	fJWTVerifier.String("auth-jwks-ca", "", "If set, use the certificates in the provided PEM to trust the remote JWKS")
-	fJWTVerifier.String("auth-jwt-cert", "", "If set, enables authentication and require JWT signed by the given certificate")
-	fJWTVerifier.StringP("auth-jwt-required-issuer", "I", "", "Sets the required issuer in the JWT when auth is enabled")
-	fJWTVerifier.StringP("auth-jwt-required-audience", "A", "", "Sets the required audience in the JWT when auth is enabled")
-	fJWTVerifier.StringP("auth-jwt-principal-claim", "S", "", "Sets the identity claim to use to extract the principal user name when auth is enabled")
-	fJWTVerifier.Bool("auth-jwks-insecure-skip-verify", false, "Don't validate the JWKS CA. Don't do this.")
+	fJWTVerifier.StringP("auth-jwks-url", "J", "", "enables authentication and requires agent to send JWTs signed by the given JWKS.")
+	fJWTVerifier.String("auth-jwks-ca", "", "path to a CA to validate the JWKS server certificates.")
+	fJWTVerifier.String("auth-jwt-cert", "", "enables authentication and requires agent to send JWTs signed by the given certificates.")
+	fJWTVerifier.StringP("auth-jwt-required-issuer", "I", "", "when auth is enabled, sets the required JWTs issuer.")
+	fJWTVerifier.StringP("auth-jwt-required-audience", "A", "", "when auth is enabled, sets the required JWTs audience.")
+	fJWTVerifier.StringP("auth-jwt-principal-claim", "S", "", "when auth is enabled, sets the identity claim to use as the principal name to send to the policer.")
+	fJWTVerifier.Bool("auth-jwks-insecure-skip-verify", false, "skip JWKS's server certificate validation. Don't do this.")
 
-	fCORS.String("cors-origin", "*", "Sets the valid HTTP Origin for CORS")
+	fCORS.String("cors-origin", "*", "sets the valid HTTP Origin for CORS responses.")
+
+	fAgentAuth.StringP("agent-token", "t", "", "JWT token to pass to the minibridge backend for agent identification.")
 }

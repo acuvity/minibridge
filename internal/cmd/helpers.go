@@ -38,7 +38,7 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 		keyPath, _ = flags.GetString("tls-client-key")
 		keyPass, _ = flags.GetString("tls-client-key-pass")
 	}
-	serverCAPath, _ := flags.GetString("tls-client-server-ca")
+	serverCAPath, _ := flags.GetString("tls-client-backend-ca")
 
 	if flags.Name() == "tlsserver" {
 		certPath, _ = flags.GetString("tls-server-cert")
@@ -117,7 +117,7 @@ func jwtVerifierConfigFromFlags() jwtVerifierConfig {
 	cfg.principalClaim, _ = fJWTVerifier.GetString("auth-jwt-principal-claim")
 
 	if cfg.jwksURL != "" || cfg.jwtCertPath != "" {
-		slog.Info("JWT verifier configured",
+		slog.Info("Agent authentication configured",
 			"jwks-url", cfg.jwksURL,
 			"jwks-custom-ca", cfg.jwksCAPath != "",
 			"cert", cfg.jwtCertPath,

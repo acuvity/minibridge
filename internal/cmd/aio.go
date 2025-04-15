@@ -27,10 +27,9 @@ func init() {
 
 	initSharedFlagSet()
 
-	fAIO.StringP("listen", "l", "", "Listen address of the bridge for incoming connections. If this is unset, stdio is used.")
-	fAIO.String("endpoint-messages", "/message", "When using HTTP, sets the endpoint to post messages")
-	fAIO.String("endpoint-sse", "/sse", "When using HTTP, sets the endpoint to connect to the event stream")
-	fAIO.StringP("agent-token", "t", "", "The user token to pass inline to the minibridge backend to identify the agent that will be passed to the policer. You must use sse server by setting --listen and configure tls for communications with minibridghe backend")
+	fAIO.StringP("listen", "l", "", "listen address of the bridge for incoming connections. If unset, stdio is used.")
+	fAIO.String("endpoint-messages", "/message", "when using HTTP, sets the endpoint to post messages.")
+	fAIO.String("endpoint-sse", "/sse", "when using HTTP, sets the endpoint to connect to the event stream.")
 
 	AIO.Flags().AddFlagSet(fAIO)
 	AIO.Flags().AddFlagSet(fPolicer)
@@ -39,11 +38,12 @@ func init() {
 	AIO.Flags().AddFlagSet(fProfiler)
 	AIO.Flags().AddFlagSet(fJWTVerifier)
 	AIO.Flags().AddFlagSet(fCORS)
+	AIO.Flags().AddFlagSet(fAgentAuth)
 }
 
 var AIO = &cobra.Command{
 	Use:              "aio [flags] -- command [args...]",
-	Short:            "Start both frontend and backend in the same process",
+	Short:            "Start an all-in-one minibridge frontend and backend",
 	Args:             cobra.MinimumNArgs(1),
 	SilenceUsage:     true,
 	SilenceErrors:    true,
@@ -112,10 +112,12 @@ var AIO = &cobra.Command{
 			defer cancel()
 
 			mcpServer := client.MCPServer{Command: args[0], Args: args[1:]}
-
-			slog.Info("Starting backend",
+			slog.Info("MCP server configured",
 				"command", mcpServer.Command,
 				"args", mcpServer.Args,
+			)
+
+			slog.Info("Minibridge backend configured",
 				"policer", policerURL,
 			)
 
@@ -134,23 +136,24 @@ var AIO = &cobra.Command{
 
 			var proxy frontend.Frontend
 
-			frontendTLSConfig, err := tlsConfigFromFlags(fTLSServer)
+			frontendServerTLSConfig, err := tlsConfigFromFlags(fTLSServer)
 			if err != nil {
 				return err
 			}
 
 			if listen != "" {
 
-				slog.Info("Starting frontend",
-					"mode", "sse",
-					"tls", frontendTLSConfig != nil,
-					"listen", listen,
+				slog.Info("Minibridge frontend configured",
 					"sse", sseEndpoint,
 					"messages", messageEndpoint,
 					"agent-token", agentToken != "",
+					"mode", "sse",
+					"server-tls", frontendServerTLSConfig != nil,
+					"client-tls", frontendClientTLSConfig != nil,
+					"listen", listen,
 				)
 
-				proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig, frontendClientTLSConfig,
+				proxy = frontend.NewSSE(listen, backendURL, frontendServerTLSConfig, frontendClientTLSConfig,
 					frontend.OptSSEStreamEndpoint(sseEndpoint),
 					frontend.OptSSEMessageEndpoint(messageEndpoint),
 					frontend.OptSSEAgentToken(agentToken),
@@ -159,7 +162,7 @@ var AIO = &cobra.Command{
 				)
 			} else {
 
-				slog.Info("Starting frontend",
+				slog.Info("Minibridge frontend configured",
 					"mode", "stdio",
 				)
 

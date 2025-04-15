@@ -15,8 +15,8 @@ func init() {
 
 	initSharedFlagSet()
 
-	Root.PersistentFlags().String("log-level", "info", "Set the log level")
-	Root.PersistentFlags().String("log-format", "console", "Set the log format")
+	Root.PersistentFlags().String("log-level", "info", "sets the log level.")
+	Root.PersistentFlags().String("log-format", "console", "sets the log format.")
 }
 
 var Root = &cobra.Command{
