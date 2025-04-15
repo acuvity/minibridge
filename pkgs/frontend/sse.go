@@ -16,10 +16,15 @@ import (
 	"go.acuvity.ai/wsc"
 )
 
+type session struct {
+	ws       wsc.Websocket
+	credHash uint64
+}
+
 type sseFrontend struct {
 	backendURL string
 	server     *http.Server
-	sessions   map[string]wsc.Websocket
+	sessions   map[string]session
 	tlsConfig  *tls.Config
 	cfg        sseCfg
 
@@ -40,7 +45,7 @@ func NewSSE(addr string, backend string, serverTLSConfig *tls.Config, clientTLSC
 	p := &sseFrontend{
 		backendURL: backend,
 		tlsConfig:  clientTLSConfig,
-		sessions:   map[string]wsc.Websocket{},
+		sessions:   map[string]session{},
 		cfg:        cfg,
 	}
 
@@ -89,9 +94,12 @@ func (p *sseFrontend) Start(ctx context.Context) error {
 	return p.server.Shutdown(stopCtx)
 }
 
-func (p *sseFrontend) registerSession(sid string, ws wsc.Websocket) {
+func (p *sseFrontend) registerSession(sid string, ws wsc.Websocket, credsHash uint64) {
 	p.Lock()
-	p.sessions[sid] = ws
+	p.sessions[sid] = session{
+		ws:       ws,
+		credHash: credsHash,
+	}
 	p.Unlock()
 }
 
@@ -101,7 +109,7 @@ func (p *sseFrontend) unregisterSession(sid string) {
 	p.Unlock()
 }
 
-func (p *sseFrontend) getSession(sid string) wsc.Websocket {
+func (p *sseFrontend) getSession(sid string) session {
 
 	p.RLock()
 	ws := p.sessions[sid]
@@ -122,13 +130,7 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	log.Debug("Handling new SSE", "client", req.RemoteAddr)
 
-	var wsAuthHeaders []string
-	var wsToken string
-	if p.cfg.agentTokenPassthrough {
-		wsAuthHeaders = req.Header["Authorization"]
-	} else if p.cfg.agentToken != "" {
-		wsToken = p.cfg.agentToken
-	}
+	wsToken, wsAuthHeaders := p.getCreds(req)
 
 	ws, err := connectWS(req.Context(), p.backendURL, p.tlsConfig, wsToken, wsAuthHeaders)
 	if err != nil {
@@ -138,12 +140,14 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	defer ws.Close(1000)
 
-	p.registerSession(sid, ws)
+	p.registerSession(sid, ws, hashCreds(wsToken, wsAuthHeaders))
 	defer p.unregisterSession(sid)
 
 	w.Header().Add("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Add("Connection", "keep-alive")
+	if req.Proto == "HTTP/1.1" {
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Add("Connection", "keep-alive")
+	}
 
 	w.WriteHeader(http.StatusOK)
 
@@ -212,8 +216,15 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 	log.Debug("Handling messages", "accept", accepts)
 
 	session := p.getSession(sid)
-	if session == nil {
+	if session.ws == nil {
 		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	}
+
+	wsToken, wsAuthHeaders := p.getCreds(req)
+
+	if hashCreds(wsToken, wsAuthHeaders) != session.credHash {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -226,8 +237,10 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 
 	log.Debug("Message data", "msg", string(data))
 
-	w.Header().Add("Connection", "keep-alive")
-	w.Header().Add("Keep-Alive", "timeout=5")
+	if req.Proto == "HTTP/1.1" {
+		w.Header().Add("Connection", "keep-alive")
+		w.Header().Add("Keep-Alive", "timeout=5")
+	}
 	w.Header().Add("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusAccepted)
 
@@ -235,7 +248,7 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 	// be needed by some clients..
 	_, _ = w.Write([]byte("Accepted"))
 
-	session.Write(data)
+	session.ws.Write(data)
 }
 
 // ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
@@ -254,4 +267,15 @@ func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case p.cfg.messagesEndpoint:
 		p.handleMessages(w, req)
 	}
+}
+
+func (p *sseFrontend) getCreds(req *http.Request) (token string, authHeaders []string) {
+
+	if p.cfg.agentTokenPassthrough {
+		authHeaders = req.Header["Authorization"]
+	} else if p.cfg.agentToken != "" {
+		token = p.cfg.agentToken
+	}
+
+	return token, authHeaders
 }

@@ -63,7 +63,7 @@ func (p *stdioFrontend) Start(ctx context.Context) error {
 		fmt.Sprintf("uid=%s", user.Uid),
 		fmt.Sprintf("username=%s", user.Username),
 		fmt.Sprintf("hostname=%s", host),
-		fmt.Sprintf("minibridge=stdio"),
+		"minibridge=stdio",
 	}
 
 	slog.Debug("Local machine user set", "user", p.user, "claims", p.claims)

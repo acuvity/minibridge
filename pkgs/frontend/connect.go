@@ -31,17 +31,15 @@ func connectWS(ctx context.Context, backendURL string, tlsConfig *tls.Config, to
 		TLSConfig:     tlsConfig,
 	}
 
-	// TODO: SECURITY DO STRIP. This is for dev.
-
-	// if tlsConfig != nil {
-	if token != "" {
-		wsconfig.Headers = http.Header{
-			"Authorization": {"Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Appendf([]byte{}, "Bearer:%s", token)))},
+	if tlsConfig != nil {
+		if token != "" {
+			wsconfig.Headers = http.Header{
+				"Authorization": {"Basic " + base64.StdEncoding.EncodeToString(fmt.Appendf([]byte{}, "Bearer:%s", token))},
+			}
+		} else if len(authHeaders) > 0 {
+			wsconfig.Headers = http.Header{"Authorization": authHeaders}
 		}
-	} else if len(authHeaders) > 0 {
-		wsconfig.Headers = http.Header{"Authorization": authHeaders}
 	}
-	// }
 
 	session, resp, err := wsc.Connect(ctx, backendURL, wsconfig)
 

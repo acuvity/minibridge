@@ -33,7 +33,7 @@ func initSharedFlagSet() {
 	fTLSClient.StringP("tls-client-key", "K", "", "Path to the key for the certificate")
 	fTLSClient.StringP("tls-client-key-pass", "P", "", "Passphrase for the key")
 	fTLSClient.String("tls-client-server-ca", "", "Path to a CA to validate server connections")
-	fTLSClient.Bool("tls-insecure-skip-verify", false, "If set, don't validate server's CA. Do not do this.")
+	fTLSClient.Bool("tls-client-insecure-skip-verify", false, "If set, don't validate server's CA. Do not do this.")
 
 	fHealth.String("health-listen", ":8080", "Listen address of the health server")
 	fHealth.Bool("health-enable", false, "If set, start a health server for production deployments")

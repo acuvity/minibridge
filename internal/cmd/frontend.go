@@ -54,7 +54,7 @@ var Frontend = &cobra.Command{
 			)
 		}
 
-		backendTLSConfig, err := tlsConfigFromFlags(fTLSClient)
+		clientTLSConfig, err := tlsConfigFromFlags(fTLSClient)
 		if err != nil {
 			return err
 		}
@@ -67,14 +67,14 @@ var Frontend = &cobra.Command{
 
 		if listen != "" {
 
-			frontendTLSConfig, err := tlsConfigFromFlags(fTLSServer)
+			serverTLSConfig, err := tlsConfigFromFlags(fTLSServer)
 			if err != nil {
 				return err
 			}
 
 			slog.Info("Starting frontend",
 				"mode", "sse",
-				"tls", frontendTLSConfig != nil,
+				"tls", serverTLSConfig != nil,
 				"backend", backendURL,
 				"listen", listen,
 				"sse", sseEndpoint,
@@ -83,7 +83,7 @@ var Frontend = &cobra.Command{
 				"agent-token-passthrough", agentTokenPassthrough,
 			)
 
-			proxy = frontend.NewSSE(listen, backendURL, frontendTLSConfig, backendTLSConfig,
+			proxy = frontend.NewSSE(listen, backendURL, serverTLSConfig, clientTLSConfig,
 				frontend.OptSSEStreamEndpoint(sseEndpoint),
 				frontend.OptSSEMessageEndpoint(messageEndpoint),
 				frontend.OptSSEAgentToken(agentToken),
@@ -98,7 +98,7 @@ var Frontend = &cobra.Command{
 				"backend", backendURL,
 			)
 
-			proxy = frontend.NewStdio(backendURL, backendTLSConfig,
+			proxy = frontend.NewStdio(backendURL, clientTLSConfig,
 				frontend.OptStioAgentToken(agentToken),
 			)
 		}

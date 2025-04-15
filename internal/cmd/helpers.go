@@ -20,10 +20,11 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 
 	var hasTLS bool
 
-	skipVerify, _ := flags.GetBool("insecure-skip-verify")
+	skipVerify, _ := flags.GetBool("tls-client-insecure-skip-verify")
 
 	if skipVerify {
 		slog.Warn("Certificate validation deactivated. Connection will not be secure")
+		hasTLS = true
 	}
 
 	tlsConfig := &tls.Config{
@@ -44,7 +45,7 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 		keyPath, _ = flags.GetString("tls-server-key")
 		keyPass, _ = flags.GetString("tls-server-key-pass")
 	}
-	clientCAPath, _ := flags.GetString("tls-serverclient-ca")
+	clientCAPath, _ := flags.GetString("tls-server-client-ca")
 
 	if certPath != "" && keyPath != "" {
 		x509Cert, x509Key, err := tglib.ReadCertificatePEM(certPath, keyPath, keyPass)

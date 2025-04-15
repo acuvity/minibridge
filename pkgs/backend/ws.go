@@ -104,6 +104,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	stream, err := client.NewStdio(p.mcpServer).Start(req.Context())
 	if err != nil {
+		slog.Error("Unable to start mcp client", err)
 		http.Error(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError)
 		return
 	}
@@ -111,6 +112,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	select {
 	default:
 	case err := <-stream.Exit:
+		slog.Error("MCP server has exited", err)
 		http.Error(w, fmt.Sprintf("mcp server has exited: %s", err), http.StatusInternalServerError)
 		return
 	}
@@ -270,7 +272,7 @@ func authenticate(tokenString string, jwks *token.JWKS, reqIss string, reqAud st
 	user.Claims = idt.Identity
 	user.Name = pclaims[0]
 
-	slog.Info("Authenticated agent", "name", user.Name, "claims", user.Claims)
+	slog.Debug("Authenticated agent", "name", user.Name, "claims", user.Claims)
 
 	return user, nil
 }
