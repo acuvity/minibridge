@@ -23,7 +23,7 @@ func makeMCPError(ID any, err error) []byte {
 		panic(err)
 	}
 
-	slog.Error("Injecting MCP error", "err", string(data))
+	slog.Debug("Injecting MCP error", "err", string(data))
 
 	return append(data, '\n')
 }

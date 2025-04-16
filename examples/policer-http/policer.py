@@ -5,7 +5,7 @@ This is an example implementation for a policer
 
 import json
 from termcolor import colored
-from flask import Flask, request
+from flask import Flask, request, Response
 
 app = Flask(__name__)
 
@@ -36,8 +36,7 @@ def police():
         print(colored("DENIED: no token", "red"))
         return json.dumps(
             {
-                "decision": "deny",
-                "reasons": ["you have not passed any token"],
+                "deny": ["you have not passed any token"],
             }
         )
 
@@ -52,12 +51,12 @@ def police():
                 f"forbidden method call {mcp['params']['name']} {mcp['method']}"
             )
             print(colored(f"DENIED: {denied_msg}", "red"))
-            return json.dumps({"decision": "deny", "reasons": [denied_msg]})
+            return json.dumps({"deny": [denied_msg]})
 
     print(colored("ALLOWED", "green"))
 
     # otherwise we allow everything
-    return json.dumps({"decision": "allow"})
+    return Response(status=204)
 
 
 app.run(port=5000)

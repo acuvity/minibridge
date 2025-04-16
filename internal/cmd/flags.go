@@ -9,7 +9,7 @@ var (
 	fTLSServer = pflag.NewFlagSet("tlsserver", pflag.ExitOnError)
 	fProfiler  = pflag.NewFlagSet("profile", pflag.ExitOnError)
 	fHealth    = pflag.NewFlagSet("health", pflag.ExitOnError)
-	fPolicer   = pflag.NewFlagSet("police", pflag.ExitOnError)
+	fPolicer   = pflag.NewFlagSet("policer", pflag.ExitOnError)
 	fCORS      = pflag.NewFlagSet("cors", pflag.ExitOnError)
 	fAgentAuth = pflag.NewFlagSet("agentauth", pflag.ExitOnError)
 
@@ -41,10 +41,12 @@ func initSharedFlagSet() {
 	fProfiler.String("profiling-listen", ":6060", "listen address of the health server.")
 	fProfiler.Bool("profiling-enable", false, "enables profiling server.")
 
-	fPolicer.StringP("policer-url", "U", "", "URL of the policer to POST agent policing requests.")
-	fPolicer.StringP("policer-token", "T", "", "token to use to authenticate against the policer.")
-	fPolicer.String("policer-ca", "", "path to a CA to validate the policer server certificates.")
-	fPolicer.Bool("policer-insecure-skip-verify", false, "skip policer's server certificates validation. INSECURE.")
+	fPolicer.StringP("policer-type", "P", "", "type of policer to use. use --policer-list to list all of them.")
+	fPolicer.String("policer-rego-policy", "", "path to a rego policy file for the rego policer.")
+	fPolicer.String("policer-http-url", "", "URL of the HTTP policer to POST agent policing requests.")
+	fPolicer.String("policer-http-token", "", "token to use to authenticate against the HTTP policer.")
+	fPolicer.String("policer-http-ca", "", "path to a CA to validate the policer server certificates.")
+	fPolicer.Bool("policer-http-insecure-skip-verify", false, "skip policer's server certificates validation. INSECURE.")
 
 	fCORS.String("cors-origin", "*", "sets the valid HTTP Origin for CORS responses.")
 

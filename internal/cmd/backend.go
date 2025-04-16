@@ -39,7 +39,6 @@ var Backend = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		listen := viper.GetString("listen")
-		policerURL := viper.GetString("policer-url")
 
 		if listen == "" {
 			return fmt.Errorf("--listen must be set")
@@ -66,7 +65,6 @@ var Backend = &cobra.Command{
 		)
 
 		slog.Info("Minibridge backend configured",
-			"policer", policerURL,
 			"server-tls", backendTLSConfig != nil,
 			"server-mtls", mtlsMode(backendTLSConfig),
 			"listen", listen,

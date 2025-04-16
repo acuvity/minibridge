@@ -125,36 +125,69 @@ func startHelperServers(ctx context.Context) bahamut.MetricsManager { // nolint:
 
 func makePolicer() (policer.Policer, error) {
 
-	policerCA, _ := fPolicer.GetString("policer-ca")
-	policerSkip, _ := fPolicer.GetBool("policer-insecure-skip-verify")
-	policerURL, _ := fPolicer.GetString("policer-url")
-	policerToken, _ := fPolicer.GetString("policer-token")
+	pType, _ := fPolicer.GetString("policer-type")
 
-	if policerURL == "" {
+	switch pType {
+
+	case "http":
+
+		httpCA, _ := fPolicer.GetString("policer-http-ca")
+		httpSkip, _ := fPolicer.GetBool("policer-http-insecure-skip-verify")
+		httpURL, _ := fPolicer.GetString("policer-http-url")
+		httpToken, _ := fPolicer.GetString("policer-http-token")
+
+		if httpURL == "" {
+			return nil, fmt.Errorf("you must set --policer-http-url when using an http policer")
+		}
+
+		var pool *x509.CertPool
+		if httpCA != "" {
+			caData, err := os.ReadFile(httpCA)
+			if err != nil {
+				return nil, fmt.Errorf("unable to read policer CA: %w", err)
+			}
+			pool.AppendCertsFromPEM(caData)
+		} else {
+			var err error
+			pool, err = x509.SystemCertPool()
+			if err != nil {
+				return nil, fmt.Errorf("unable to load system ca pool: %w", err)
+			}
+		}
+
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: httpSkip,
+			RootCAs:            pool,
+		}
+
+		slog.Info("Policer configured", "type", "http", "url", httpURL)
+
+		return policer.NewHTTP(httpURL, httpToken, tlsConfig), nil
+
+	case "rego":
+
+		regoFile, _ := fPolicer.GetString("policer-rego-policy")
+
+		if regoFile == "" {
+			return nil, fmt.Errorf("you must set --policer-rego-policy when using a rego policer")
+		}
+
+		data, err := os.ReadFile(regoFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable open rego policy file: %w", err)
+		}
+
+		slog.Info("Policer configured", "type", "rego", "policy", regoFile)
+
+		return policer.NewRego(string(data))
+
+	case "":
 		return nil, nil
+
+	default:
+		return nil, fmt.Errorf("unknown type of policer: %s", pType)
 	}
 
-	var pool *x509.CertPool
-	if policerCA != "" {
-		caData, err := os.ReadFile(policerCA)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read policer CA: %w", err)
-		}
-		pool.AppendCertsFromPEM(caData)
-	} else {
-		var err error
-		pool, err = x509.SystemCertPool()
-		if err != nil {
-			return nil, fmt.Errorf("unable to load system ca pool: %w", err)
-		}
-	}
-
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: policerSkip,
-		RootCAs:            pool,
-	}
-
-	return policer.New(policerURL, policerToken, tlsConfig), nil
 }
 
 func makeCORSPolicy() *bahamut.CORSPolicy {

@@ -10,12 +10,6 @@ Minibridge does not need to interpret the core MCP protocol, as it only handles
 data streams. This design ensures forward compatibility with future changes to
 the MCP protocol.
 
-Currently, Minibridge is compatible with any compliant MCP server using protocol
-version 2024-11-05. Support for version 2025-03-26 is in progress.
-
-> Note: Minibridge is still under active development.
-
-
 ## Table of Content
 
 <!-- vim-markdown-toc GFM -->
@@ -26,8 +20,9 @@ version 2024-11-05. Support for version 2025-03-26 is in progress.
   * [Stdio](#stdio)
   * [HTTP+SSE](#httpsse)
 * [Policer](#policer)
-  * [Police Request API](#police-request-api)
-  * [Police Response API](#police-response-api)
+  * [Police Request](#police-request)
+  * [HTTP Policer](#http-policer)
+  * [Rego Policer](#rego-policer)
   * [Agent Authentication](#agent-authentication)
     * [Global](#global)
     * [Forward](#forward)
@@ -228,29 +223,40 @@ integration with a Policer. A Policer is responsible for:
 * Full request tracing
 * And more advanced policy-based controls
 
+There are various available policers in minibridge:
+
+- HTTP policer: sends a request to a remote HTTP service to delegate decision
+- Rego policer: runs a [rego](https://www.openpolicyagent.org/docs/latest)
+  policy file on the request
+
+> NOTE: More policers will be added!
+
 The Policer, if set, will be called and passed various information so it can
 make a decision on what to do with the request, based on the user who initiated
 the request and the content of the request.
 
-> NOTE: You can find an example of a policer in `policers/example`.
-
 You can then start Minibridge, using either the aio or backend subcommand, with
-the following arguments:
+the following arguments to start an HTTP policer:
 
-    minibridge aio --policer-url https://policer.acme.com/police --policer-token $PTOKEN
+    minibridge aio --policer-type http \
+      --policer-http-url https://policer.acme.com/police --policer-http-token $PTOKEN
+
+Or using with the following command to start Minibridge with a Rego policer:
+
+    minibridge aio --policer-type rego \
+      --policer-rego-policy ./example/policer-rego/policy.rego
 
 Once integrated, any command from the user or response from the MCP Server
 received by the backend is first passed to the Policer for authentication and/or
 analysis.
 
-### Police Request API
+### Police Request
 
-The Policer receives a `POST` request at the `--policer-url` endpoint in the
-following format:
+The Policer will receives the following information:
 
 ```json
 {
-  "type": "input"
+  "type": "input|output"
   "agent": {
     "token": "<agent-token>",
     "userAgent": "curl/7.54.1",
@@ -264,43 +270,82 @@ following format:
 }
 ```
 
-> NOTE: for a response from the MCP Server, the `type` will be set to `output`
-and no user will be passed.
+The Policer can use this information to decide if the request should be denied.
 
-> NOTE: minibrige `--policer-token` will be passed in the `Authorization`
-> header of the POST request made to the policer.
-
-### Police Response API
-
-The Policer must respond with an HTTP status code `200 OK` if the request passes
-the policy checks. Any other status code will be treated as a failure, and the
-request will be blocked.
-
-For a policy decision that permits the request:
-
-```json
-{
-  "decision": "allow"
-}
-```
-
-For a policy result that denies the request:
-
-```json
-{
-  "decision": "deny",
-  "reasons": ["You are not allowed to list the tools"]
-}
-```
-
-If the request is denied (or the Policer does not return `200 OK`), Minibridge
-will not forward it to the MCP server. Instead, it will return a descriptive MCP
-error to the client, indicating why the request was blocked.
+If the request is denied, Minibridge will not forward it to the MCP server.
+Instead, it will return a descriptive MCP error to the client, indicating why
+the request was blocked.
 
 Example:
 
     $ mcptools tools http://127.0.0.1:8000
-    error: RPC error 451: request blocked: ForbiddenUser: You are not allowed to list the tools
+    error: RPC error 451: request blocked: You are not allowed to list the tools
+
+### HTTP Policer
+
+The HTTP Policer will receive the Police Request as `POST` on the url provided
+by `--provider-http-url`.
+
+The HTTP Policer must respond with
+
+- An HTTP status `204 No Content` if the request should be allowed.
+- An HTTP status `200 OK` in case of deny with a valid response.
+
+Any other status code will be treated as a failure, and the request will be
+blocked and an error will be logged by Minibridge.
+
+For example, a policy result that denies the request:
+
+```http
+HTTP/2.0 200 OK
+
+{
+  "deny": ["You are not allowed to list the tools"]
+}
+```
+
+And a policy result that permits the request:
+
+```http
+HTTP/2.0 204 No Content
+```
+
+> NOTE: returning a deny set to `null` or `[]` will be considered as allowed.
+
+### Rego Policer
+
+The Rego Policer allows to run the Police Request through a rego policy to
+decide if the request should be allowed or not. The Police Request is passed an
+input, and the rego policy must either return and `allow := true` or an empty
+`deny` string array.
+
+> NOTE: the rego package must be named `main`.
+
+For instance, to allow the request:
+
+```regp
+package main
+
+allow := true
+```
+
+To deny the request:
+
+```rego
+package main
+
+deny contains msg if {
+  input.agent.token == ""
+  msg := "you must send a token"
+}
+
+deny contains msg if {
+  input.mcp.method == "tools/call"
+  input.mcp.params.name == "printEnv"
+  msg := "you cannot use printEnv"
+}
+```
+
 
 ### Agent Authentication
 

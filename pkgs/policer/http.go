@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,18 +13,16 @@ import (
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 )
 
-var ErrBlocked = errors.New("request blocked")
-
-type policer struct {
+type httpPolicer struct {
 	endpoint string
 	token    string
 	client   *http.Client
 }
 
-// New returns a new Policer.
-func New(endpoint string, token string, tlsConfig *tls.Config) Policer {
+// NewHTTP returns a new HTTP based Policer.
+func NewHTTP(endpoint string, token string, tlsConfig *tls.Config) Policer {
 
-	return &policer{
+	return &httpPolicer{
 		endpoint: endpoint,
 		token:    token,
 		client: &http.Client{
@@ -36,7 +33,7 @@ func New(endpoint string, token string, tlsConfig *tls.Config) Policer {
 	}
 }
 
-func (p *policer) Police(ctx context.Context, preq api.Request) error {
+func (p *httpPolicer) Police(ctx context.Context, preq api.Request) error {
 
 	body, err := elemental.Encode(elemental.EncodingTypeJSON, preq)
 	if err != nil {
@@ -63,6 +60,10 @@ func (p *policer) Police(ctx context.Context, preq api.Request) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("invalid response from policer `%s`: %s", string(rbody), resp.Status)
 	}
@@ -72,10 +73,9 @@ func (p *policer) Police(ctx context.Context, preq api.Request) error {
 		return fmt.Errorf("unable to decode response body: %w", err)
 	}
 
-	// We check with equalfolds to be compatible with an exiting API.
-	if !strings.EqualFold(string(sresp.Decision), string(api.DecisionAllow)) {
-		return fmt.Errorf("%w: %s: %s", ErrBlocked, sresp.Decision, strings.Join(sresp.Reasons, ", "))
+	if len(sresp.Deny) == 0 {
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("%w: %s", ErrBlocked, strings.Join(sresp.Deny, ", "))
 }

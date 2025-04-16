@@ -58,7 +58,6 @@ var AIO = &cobra.Command{
 		listen := viper.GetString("listen")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
-		policerURL := viper.GetString("policer-url")
 		agentToken := viper.GetString("agent-token")
 
 		if agentToken != "" {
@@ -110,9 +109,7 @@ var AIO = &cobra.Command{
 				"args", mcpServer.Args,
 			)
 
-			slog.Info("Minibridge backend configured",
-				"policer", policerURL,
-			)
+			slog.Info("Minibridge backend configured")
 
 			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
 				backend.OptWSPolicer(policer),

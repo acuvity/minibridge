@@ -250,10 +250,6 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusAccepted)
 
-	// this is against spec. however it seems to
-	// be needed by some clients..
-	_, _ = w.Write([]byte("Accepted"))
-
 	session.ws.Write(data)
 }
 
