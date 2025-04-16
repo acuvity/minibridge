@@ -132,7 +132,12 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	wsToken, wsAuthHeaders := p.getCreds(req)
 
-	ws, err := connectWS(req.Context(), p.backendURL, p.tlsConfig, wsToken, wsAuthHeaders)
+	ws, err := connectWS(req.Context(), p.backendURL, p.tlsConfig, agentInfo{
+		token:       wsToken,
+		authHeaders: wsAuthHeaders,
+		remoteAddr:  req.RemoteAddr,
+		userAgent:   req.UserAgent(),
+	})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Unable to connect to minibridge end: %s", err), http.StatusInternalServerError)
 		return

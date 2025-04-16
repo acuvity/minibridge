@@ -138,6 +138,12 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	rb := ringbuffer.New(4096)
 
+	agent := api.Agent{
+		Token:      agentToken,
+		RemoteAddr: req.Header.Get("X-Forwarded-For"),
+		UserAgent:  req.Header.Get("X-Forwarded-UA"),
+	}
+
 	for {
 
 		select {
@@ -158,7 +164,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					continue
 				}
 
-				if err := pol.Police(req.Context(), api.Request{Type: api.Input, Token: agentToken, MCP: call}); err != nil {
+				if err := pol.Police(req.Context(), api.Request{Type: api.Input, Agent: agent, MCP: call}); err != nil {
 					if errors.Is(err, policer.ErrBlocked) {
 						session.Write(makeMCPError(call.ID, err))
 						continue
@@ -182,7 +188,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 					continue
 				}
 
-				if err := pol.Police(req.Context(), api.Request{Type: api.Output, Token: agentToken, MCP: call}); err != nil {
+				if err := pol.Police(req.Context(), api.Request{Type: api.Output, Agent: agent, MCP: call}); err != nil {
 					if errors.Is(err, policer.ErrBlocked) {
 						session.Write(makeMCPError(call.ID, err))
 						continue
