@@ -23,13 +23,11 @@ def police():
     print()
     print("---")
     print(
-        colored(
-            f"Type: ${req['type']}", "green" if req["type"] == "input" else "yellow"
-        )
+        colored(f"Type: {req['type']}", "green" if req["type"] == "input" else "yellow")
     )
-    print(colored(f"Agent: ${agent['userAgent']} ${agent['remoteAddr']}", "blue"))
+    print(colored(f"Agent: {agent['userAgent']} {agent['remoteAddr']}", "blue"))
     print()
-    print(colored(f"${request.headers}", "dark_grey"))
+    print(colored(f"{request.headers}", "dark_grey"))
     print(json.dumps(req, sort_keys=True, indent=4))
 
     # If there is no agent token, we refuse the call.
@@ -51,9 +49,9 @@ def police():
             and mcp["params"]["name"] in FORBIDDEN_METHODS
         ):
             denied_msg = (
-                f"forbidden method call ${mcp['params']['name']} ${mcp['method']}"
+                f"forbidden method call {mcp['params']['name']} {mcp['method']}"
             )
-            print(colored(f"DENIED: ${denied_msg}", "red"))
+            print(colored(f"DENIED: {denied_msg}", "red"))
             return json.dumps({"decision": "deny", "reasons": [denied_msg]})
 
     print(colored("ALLOWED", "green"))

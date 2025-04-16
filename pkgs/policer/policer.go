@@ -72,7 +72,8 @@ func (p *policer) Police(ctx context.Context, preq api.Request) error {
 		return fmt.Errorf("unable to decode response body: %w", err)
 	}
 
-	if sresp.Decision != api.DecisionAllow {
+	// We check with equalfolds to be compatible with an exiting API.
+	if !strings.EqualFold(string(sresp.Decision), string(api.DecisionAllow)) {
 		return fmt.Errorf("%w: %s: %s", ErrBlocked, sresp.Decision, strings.Join(sresp.Reasons, ", "))
 	}
 
