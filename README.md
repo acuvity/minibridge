@@ -251,7 +251,11 @@ following format:
 ```json
 {
   "type": "input"
-  "token": "<agent-token>",
+  "agent": {
+    "token": "<agent-token>",
+    "userAgent": "curl/7.54.1",
+    "remoteAddr": "10.0.1.265:44536",
+  },
   "mcp": {
     "jsonrpc": "2.0",
     "id": 1,
