@@ -50,9 +50,10 @@ func NewSSE(addr string, backend string, serverTLSConfig *tls.Config, clientTLSC
 	}
 
 	p.server = &http.Server{
-		Addr:      addr,
-		Handler:   p,
-		TLSConfig: serverTLSConfig,
+		Addr:              addr,
+		Handler:           p,
+		TLSConfig:         serverTLSConfig,
+		ReadHeaderTimeout: time.Second,
 	}
 
 	return p

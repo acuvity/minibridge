@@ -81,7 +81,9 @@ var AIO = &cobra.Command{
 			return err
 		}
 		if frontendClientTLSConfig == nil {
-			frontendClientTLSConfig = &tls.Config{}
+			frontendClientTLSConfig = &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			}
 		}
 
 		frontendClientTLSConfig.RootCAs = trustPool
@@ -200,6 +202,7 @@ func makeTempTLSConfig() (*tls.Config, *x509.CertPool, error) {
 
 	return &tls.Config{
 		Certificates: []tls.Certificate{tlsServerCert},
+		MinVersion:   tls.VersionTLS13,
 	}, pool, nil
 }
 

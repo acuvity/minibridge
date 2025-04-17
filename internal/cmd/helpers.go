@@ -26,7 +26,7 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 	}
 
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: skipVerify,
+		InsecureSkipVerify: skipVerify, // #nosec: G402
 	}
 
 	var certPath, keyPath, keyPass string
@@ -61,7 +61,7 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 	}
 
 	if serverCAPath != "" {
-		data, err := os.ReadFile(serverCAPath)
+		data, err := os.ReadFile(serverCAPath) // #nosec: G304
 		if err != nil {
 			return nil, fmt.Errorf("unable to read trusted ca: %w", err)
 		}
@@ -73,7 +73,7 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 	}
 
 	if clientCAPath != "" {
-		data, err := os.ReadFile(clientCAPath)
+		data, err := os.ReadFile(clientCAPath) // #nosec: G304
 		if err != nil {
 			return nil, fmt.Errorf("unable to read client ca: %w", err)
 		}
@@ -142,7 +142,7 @@ func makePolicer() (policer.Policer, error) {
 
 		var pool *x509.CertPool
 		if httpCA != "" {
-			caData, err := os.ReadFile(httpCA)
+			caData, err := os.ReadFile(httpCA) // #nosec: G304
 			if err != nil {
 				return nil, fmt.Errorf("unable to read policer CA: %w", err)
 			}
@@ -156,7 +156,7 @@ func makePolicer() (policer.Policer, error) {
 		}
 
 		tlsConfig := &tls.Config{
-			InsecureSkipVerify: httpSkip,
+			InsecureSkipVerify: httpSkip, // #nosec: G402
 			RootCAs:            pool,
 		}
 
@@ -172,7 +172,7 @@ func makePolicer() (policer.Policer, error) {
 			return nil, fmt.Errorf("you must set --policer-rego-policy when using a rego policer")
 		}
 
-		data, err := os.ReadFile(regoFile)
+		data, err := os.ReadFile(regoFile) // #nosec: G304
 		if err != nil {
 			return nil, fmt.Errorf("unable open rego policy file: %w", err)
 		}

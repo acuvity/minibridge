@@ -25,7 +25,7 @@ func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {
 
 	subctx, cancel := context.WithCancel(ctx)
 
-	cmd := exec.CommandContext(subctx, c.srv.Command, c.srv.Args...)
+	cmd := exec.CommandContext(subctx, c.srv.Command, c.srv.Args...) // #nosec: G204
 	cmd.Env = append(os.Environ(), c.srv.Env...)
 
 	stdin, err := cmd.StdinPipe()

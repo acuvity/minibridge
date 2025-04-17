@@ -46,9 +46,10 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServ
 	}
 
 	p.server = &http.Server{
-		TLSConfig: tlsConfig,
-		Addr:      listen,
-		Handler:   p,
+		TLSConfig:         tlsConfig,
+		Addr:              listen,
+		Handler:           p,
+		ReadHeaderTimeout: time.Second,
 	}
 
 	return p
