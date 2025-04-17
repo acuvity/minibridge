@@ -29,7 +29,7 @@ func NewRego(policy string) (Policer, error) {
 
 	comp, err := precompile(policy, "default")
 	if err != nil {
-		return nil, fmt.Errorf("Unable to compile rego policy: %w", err)
+		return nil, fmt.Errorf("unable to compile rego policy: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -40,7 +40,7 @@ func NewRego(policy string) (Policer, error) {
 		rego.Query("deny := data.main.deny"),
 	).PrepareForEval(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to prepare rego query: %w", err)
+		return nil, fmt.Errorf("unable to prepare rego query: %w", err)
 	}
 
 	return &regoPolicer{
