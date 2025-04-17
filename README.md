@@ -20,9 +20,12 @@ the MCP protocol.
   * [Stdio](#stdio)
   * [HTTP+SSE](#httpsse)
 * [Policer](#policer)
-  * [Police Request](#police-request)
-  * [HTTP Policer](#http-policer)
-  * [Rego Policer](#rego-policer)
+  * [Policer API](#policer-api)
+    * [Police Request](#police-request)
+    * [Police Response](#police-response)
+  * [Available Policers](#available-policers)
+    * [HTTP Policer](#http-policer)
+    * [Rego Policer](#rego-policer)
   * [Agent Authentication](#agent-authentication)
     * [Global](#global)
     * [Forward](#forward)
@@ -250,13 +253,15 @@ Once integrated, any command from the user or response from the MCP Server
 received by the backend is first passed to the Policer for authentication and/or
 analysis.
 
-### Police Request
+### Policer API
+
+#### Police Request
 
 The Policer will receives the following information:
 
 ```json
 {
-  "type": "input|output"
+  "type": "request|response"
   "agent": {
     "token": "<agent-token>",
     "userAgent": "curl/7.54.1",
@@ -272,27 +277,46 @@ The Policer will receives the following information:
 
 The Policer can use this information to decide if the request should be denied.
 
-If the request is denied, Minibridge will not forward it to the MCP server.
-Instead, it will return a descriptive MCP error to the client, indicating why
-the request was blocked.
+#### Police Response
 
-Example:
+The policer must return a response with the following information:
 
-    $ mcptools tools http://127.0.0.1:8000
-    error: RPC error 451: request blocked: You are not allowed to list the tools
+```json
+{
+  "deny": ["reason 1", "reason 2"],
+  "mcp": null,
+}
+```
 
-### HTTP Policer
+If `deny` is set an not empty, then the request or response is considered as
+blocked and minibridge will not forward it to the MCP server or to the Agent.
+Instead, it will return a descriptive MCP error containing the deny reasons, to
+the caller.
+
+If `deny` is `null` or empty, the call is allowed and will be forwarded.
+
+In addition, if the call is allowed, and `mcp` is non null, Minibridge will swap
+the original MCP call with the one provider in the response, allowing Policers
+to mutate the call. For instance this can be used to hide some tools based on
+the agent identity.
+
+### Available Policers
+
+#### HTTP Policer
 
 The HTTP Policer will receive the Police Request as `POST` on the url provided
 by `--provider-http-url`.
 
-The HTTP Policer must respond with
+To allow the request or response, the HTTP Policer must respond with:
 
-- An HTTP status `204 No Content` if the request should be allowed.
+- An HTTP status `204 No Content`, or
+- An HTTP status `200 OK` with `deny` property set to `null` or `[]`
+
+To disallow the request or response:
+
 - An HTTP status `200 OK` in case of deny with a valid response.
+- Any other HTTP code will also deny the request, but is considered as an error.
 
-Any other status code will be treated as a failure, and the request will be
-blocked and an error will be logged by Minibridge.
 
 For example, a policy result that denies the request:
 
@@ -310,9 +334,36 @@ And a policy result that permits the request:
 HTTP/2.0 204 No Content
 ```
 
-> NOTE: returning a deny set to `null` or `[]` will be considered as allowed.
+Or
 
-### Rego Policer
+```http
+HTTP/2.0 200 OK
+
+{
+  "deny": [],
+}
+```
+
+The HTTP Policer can also decide to mutate the MCP call. To do so, it must allow
+the request, and pass back a modified MCP call:
+
+```http
+HTTP/2.0 200 OK
+
+{
+  "mcp": {
+    "id": 2,
+    "jsonrpc": "2.0",
+    "result": {
+    "tools": [{
+      "description": "POLICER HAS MODIFIED THIS DESCRIPTION",
+      "name": "echo"
+    }]
+  }
+}
+```
+
+#### Rego Policer
 
 The Rego Policer allows to run the Police Request through a rego policy to
 decide if the request should be allowed or not. The Police Request is passed an
@@ -325,6 +376,7 @@ For instance, to allow the request:
 
 ```regp
 package main
+import rego.v1
 
 allow := true
 ```
@@ -333,6 +385,7 @@ To deny the request:
 
 ```rego
 package main
+import rego.v1
 
 deny contains msg if {
   input.agent.token == ""
@@ -345,7 +398,6 @@ deny contains msg if {
   msg := "you cannot use printEnv"
 }
 ```
-
 
 ### Agent Authentication
 
