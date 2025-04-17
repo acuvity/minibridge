@@ -9,9 +9,9 @@ echo "token for Alice"
 jwt encode --secret secret --iss pki.example.com -P email=alice@example.com --aud minibridge
 
 echo
-echo "token for Bob (will not be able to call printEnv in the example)"
+echo "token for Bob"
 jwt encode --secret secret --iss pki.example.com -P email=bob@example.com --aud minibridge
 
 echo
-echo "Token with invalid signature"
-jwt encode --secret not-secret --iss pki.example.com random.issuer -P email=eve@example.com --aud minibridge
+echo "Token for Eve"
+jwt encode --secret "not-secret" --iss pki.example.com -P email=eve@example.com --aud minibridge

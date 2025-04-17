@@ -152,53 +152,33 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from websocket", "msg", string(data))
 
-			if !bytes.HasSuffix(data, []byte("\n")) {
-				data = append(data, '\n')
-			}
-
-			if pol := p.cfg.policer; pol != nil {
-
-				call := api.MCPCall{}
-				if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
-					slog.Error("Unable to decode mcp call", err)
+			data, err = policeData(req.Context(), p.cfg.policer, api.CallTypeRequest, agent, data)
+			if err != nil {
+				if errors.Is(err, api.ErrBlocked) {
+					session.Write(sanitizeData(data))
 					continue
 				}
-
-				if err := pol.Police(req.Context(), api.Request{Type: api.Input, Agent: agent, MCP: call}); err != nil {
-					if errors.Is(err, policer.ErrBlocked) {
-						session.Write(makeMCPError(call.ID, err))
-						continue
-					}
-					slog.Error("Unable to run input analysis", err)
-					continue
-				}
+				slog.Error("Unable to police request", err)
+				continue
 			}
 
-			stream.Stdin <- data
+			stream.Stdin <- sanitizeData(data)
 
 		case data := <-stream.Stdout:
 
 			slog.Debug("Received data from MCP Server", "msg", string(data))
 
-			if pol := p.cfg.policer; pol != nil {
-
-				call := api.MCPCall{}
-				if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
-					slog.Error("Unable to decode mcp call", err)
+			data, err = policeData(req.Context(), p.cfg.policer, api.CallTypeOutput, agent, data)
+			if err != nil {
+				if errors.Is(err, api.ErrBlocked) {
+					session.Write(sanitizeData(data))
 					continue
 				}
-
-				if err := pol.Police(req.Context(), api.Request{Type: api.Output, Agent: agent, MCP: call}); err != nil {
-					if errors.Is(err, policer.ErrBlocked) {
-						session.Write(makeMCPError(call.ID, err))
-						continue
-					}
-					slog.Error("Unable to run output analysis", err)
-					continue
-				}
+				slog.Error("Unable to police response", err)
+				continue
 			}
 
-			session.Write(data)
+			session.Write(sanitizeData(data))
 
 		case data := <-stream.Stderr:
 			_, _ = rb.Write(data)
@@ -232,8 +212,11 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func parseBasicAuth(auth string) (password string, ok bool) {
+
 	const prefix = "Basic "
+
 	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+
 		parts := strings.SplitN(auth, " ", 2)
 		if len(parts) == 2 {
 			return parts[1], true
@@ -245,10 +228,59 @@ func parseBasicAuth(auth string) (password string, ok bool) {
 	if err != nil {
 		return "", false
 	}
+
 	cs := string(c)
-	_, password, ok = strings.Cut(cs, ":")
-	if !ok {
+
+	if _, password, ok = strings.Cut(cs, ":"); !ok {
 		return "", false
 	}
+
 	return password, true
+}
+
+func sanitizeData(data []byte) []byte {
+
+	if bytes.HasSuffix(data, []byte{'\n', '\n'}) {
+		return data
+	}
+
+	if bytes.HasSuffix(data, []byte{'\n'}) {
+		return append(data, '\n')
+	}
+
+	return append(data, '\n', '\n')
+}
+
+func policeData(ctx context.Context, pol policer.Policer, typ api.CallType, agent api.Agent, data []byte) ([]byte, error) {
+
+	if pol == nil {
+		return data, nil
+	}
+
+	call := api.MCPCall{}
+	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
+		return nil, fmt.Errorf("unable to decode mcp call: %w", err)
+	}
+
+	rcall, err := pol.Police(ctx, api.Request{Type: typ, Agent: agent, MCP: call})
+	if err != nil {
+
+		if errors.Is(err, api.ErrBlocked) {
+			return makeMCPError(call.ID, err), err
+		}
+
+		return nil, fmt.Errorf("unable to run policer.Police: %w", err)
+	}
+
+	if rcall != nil {
+
+		// swap data
+		data, err = elemental.Encode(elemental.EncodingTypeJSON, rcall)
+		if err != nil {
+			return nil, fmt.Errorf("unable to reencode modified mcp call: %w", err)
+		}
+
+	}
+
+	return data, nil
 }

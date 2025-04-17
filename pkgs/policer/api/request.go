@@ -1,12 +1,12 @@
 package api
 
-// RequestType type of request to the policer.
-type RequestType string
+// CallType type of request to the policer.
+type CallType string
 
 // Various values of RequestType
 var (
-	Input  RequestType = "input"
-	Output RequestType = "output"
+	CallTypeRequest CallType = "request"
+	CallTypeOutput  CallType = "response"
 )
 
 // An MPCError represents an inline MPC error.
@@ -29,9 +29,9 @@ type MCPCall struct {
 // A Request represents the data sent to the Policer
 type Request struct {
 
-	// Type of the request. Input will be set for request from the agent
-	// and Output will be set for replies from the MPC server.
-	Type RequestType `json:"type"`
+	// Type of the request. Request will be set for request from the agent
+	// and Response will be set for replies from the MPC server.
+	Type CallType `json:"type"`
 
 	// MPC embeds the full MPC call, either request or response,
 	// based on the Type.
