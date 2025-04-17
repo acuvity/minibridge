@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
+	"strings"
 	"time"
 )
 
@@ -125,7 +126,7 @@ func (p *stdioFrontend) wspump(ctx context.Context) error {
 
 				case data := <-session.Read():
 					if len(data) > 0 {
-						fmt.Println(string(data))
+						fmt.Println(strings.TrimRight(string(data), "\n"))
 					}
 
 				case err := <-session.Error():
