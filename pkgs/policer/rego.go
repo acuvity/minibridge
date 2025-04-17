@@ -3,13 +3,22 @@ package policer
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/open-policy-agent/opa/v1/ast"
 	"github.com/open-policy-agent/opa/v1/rego"
+	"github.com/open-policy-agent/opa/v1/topdown/print"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 )
+
+type printer struct{}
+
+func (p printer) Print(ctx print.Context, s string) error {
+	slog.Info(fmt.Sprintf("Rego Print: %s", s), "row", ctx.Location.Row)
+	return nil
+}
 
 type regoPolicer struct {
 	query rego.PreparedEvalQuery
@@ -41,7 +50,11 @@ func NewRego(policy string) (Policer, error) {
 
 func (p *regoPolicer) Police(ctx context.Context, preq api.Request) error {
 
-	res, err := p.query.Eval(ctx, rego.EvalInput(preq))
+	res, err := p.query.Eval(
+		ctx,
+		rego.EvalInput(preq),
+		rego.EvalPrintHook(printer{}),
+	)
 	if err != nil {
 		return fmt.Errorf("unable to eval rego: %w", err)
 	}
@@ -50,11 +63,11 @@ func (p *regoPolicer) Police(ctx context.Context, preq api.Request) error {
 		return fmt.Errorf("invalid evaluation results: empty bindings")
 	}
 
-	bindings := res[0].Bindings
-
 	if res.Allowed() {
 		return nil
 	}
+
+	bindings := res[0].Bindings
 
 	breasons, ok := bindings["deny"].([]any)
 	if !ok {
@@ -77,7 +90,7 @@ func precompile(policy string, name string, modules ...*ast.Module) (*ast.Compil
 
 	name = name + ".rego"
 
-	compiler := ast.NewCompiler()
+	compiler := ast.NewCompiler().WithEnablePrintStatements(true)
 	module, err := prepareModule("main", policy)
 	if err != nil {
 		return nil, err
@@ -102,14 +115,12 @@ func precompile(policy string, name string, modules ...*ast.Module) (*ast.Compil
 func prepareModule(name string, policy string) (*ast.Module, error) {
 
 	caps := ast.CapabilitiesForThisVersion()
-	caps.AllowNet = []string{}
 
 	module, err := ast.ParseModuleWithOpts(
 		name,
 		policy,
 		ast.ParserOptions{
-			ProcessAnnotation: false,
-			Capabilities:      caps,
+			Capabilities: caps,
 		},
 	)
 	if err != nil {
