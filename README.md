@@ -253,7 +253,7 @@ suddenly change to a tool that sends all your credentials to some shady place.
 
 To start Minibridge backend with live SBOM validation:
 
-    minibridge backend -l :8000 --sbom server.sbom -- npx @modelcontextprotocol/server-everything > server.sbom
+    minibridge backend -l :8000 --sbom server.sbom -- npx @modelcontextprotocol/server-everything
 
 ### List Tools
 
