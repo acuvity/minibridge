@@ -229,7 +229,7 @@ func mtlsMode(tlsCfg *tls.Config) string {
 
 func makeSBOM() (utils.SBOM, error) {
 
-	sbomFile, _ := fSBOM.GetString("hashes")
+	sbomFile, _ := fSBOM.GetString("sbom")
 
 	if sbomFile == "" {
 		return utils.SBOM{}, nil
