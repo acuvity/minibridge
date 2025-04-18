@@ -33,6 +33,12 @@ func DumpTools(ctx context.Context, stream *client.MCPStream) (api.Tools, error)
 		return nil, fmt.Errorf("unable to send mcp request: %w", err)
 	}
 
+	notif := api.NewMCPCall(-1)
+	notif.Method = "notifications/initialized"
+	if err := stream.Send(notif); err != nil {
+		return nil, fmt.Errorf("unable to send mcp inititlized notif: %w", err)
+	}
+
 	call := api.NewMCPCall(1)
 	call.Method = "tools/list"
 
