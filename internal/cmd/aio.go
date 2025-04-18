@@ -38,6 +38,7 @@ func init() {
 	AIO.Flags().AddFlagSet(fProfiler)
 	AIO.Flags().AddFlagSet(fCORS)
 	AIO.Flags().AddFlagSet(fAgentAuth)
+	AIO.Flags().AddFlagSet(fSBOM)
 }
 
 var AIO = &cobra.Command{
@@ -88,6 +89,11 @@ var AIO = &cobra.Command{
 
 		frontendClientTLSConfig.RootCAs = trustPool
 
+		sbom, err := makeSBOM()
+		if err != nil {
+			return fmt.Errorf("unable to make hashes: %w", err)
+		}
+
 		corsPolicy := makeCORSPolicy()
 
 		startHelperServers(ctx)
@@ -116,6 +122,7 @@ var AIO = &cobra.Command{
 			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
 				backend.OptWSPolicer(policer),
 				backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
+				backend.OptSBOM(sbom),
 			)
 
 			return proxy.Start(ctx)

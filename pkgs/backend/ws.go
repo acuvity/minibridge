@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/gorilla/websocket"
 	"github.com/smallnest/ringbuffer"
 	"go.acuvity.ai/elemental"
@@ -21,6 +22,7 @@ import (
 	"go.acuvity.ai/minibridge/pkgs/cors"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
+	"go.acuvity.ai/minibridge/pkgs/utils"
 	"go.acuvity.ai/wsc"
 )
 
@@ -153,7 +155,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from websocket", "msg", string(data))
 
-			data, err = policeData(req.Context(), p.cfg.policer, api.CallTypeRequest, agent, data)
+			data, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, data)
 			if err != nil {
 				if errors.Is(err, api.ErrBlocked) {
 					session.Write(sanitizeData(data))
@@ -169,7 +171,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from MCP Server", "msg", string(data))
 
-			data, err = policeData(req.Context(), p.cfg.policer, api.CallTypeOutput, agent, data)
+			data, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeOutput, agent, data)
 			if err != nil {
 				if errors.Is(err, api.ErrBlocked) {
 					session.Write(sanitizeData(data))
@@ -252,15 +254,34 @@ func sanitizeData(data []byte) []byte {
 	return append(data, '\n', '\n')
 }
 
-func policeData(ctx context.Context, pol policer.Policer, typ api.CallType, agent api.Agent, data []byte) ([]byte, error) {
-
-	if pol == nil {
-		return data, nil
-	}
+func policeData(ctx context.Context, pol policer.Policer, hashes utils.SBOM, typ api.CallType, agent api.Agent, data []byte) ([]byte, error) {
 
 	call := api.MCPCall{}
 	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
 		return nil, fmt.Errorf("unable to decode mcp call: %w", err)
+	}
+
+	// this is tools response, if we have hashes, will will
+	// run a comparison.
+	if dtools, ok := call.Result["tools"]; ok && len(hashes.Tools) > 0 {
+
+		tools := api.Tools{}
+		if err := mapstructure.Decode(dtools, &tools); err != nil {
+			return nil, fmt.Errorf("unable to decode tools result for hashing: %w", err)
+		}
+
+		lhashes, err := utils.HashTools(tools)
+		if err != nil {
+			return nil, fmt.Errorf("unable to hash tools result: %w", err)
+		}
+
+		if err := hashes.Matches(utils.SBOM{Tools: lhashes}); err != nil {
+			return makeMCPError(call.ID, err), fmt.Errorf("%w: %w", api.ErrBlocked, err)
+		}
+	}
+
+	if pol == nil {
+		return data, nil
 	}
 
 	rcall, err := pol.Police(ctx, api.Request{Type: typ, Agent: agent, MCP: call})

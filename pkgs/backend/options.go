@@ -3,12 +3,14 @@ package backend
 import (
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/policer"
+	"go.acuvity.ai/minibridge/pkgs/utils"
 )
 
 type wsCfg struct {
 	policer    policer.Policer
 	dumpStderr bool
 	corsPolicy *bahamut.CORSPolicy
+	sbom       utils.SBOM
 }
 
 func newWSCfg() wsCfg {
@@ -38,5 +40,13 @@ func OptWSDumpStderrOnError(dump bool) OptWS {
 func OptWSCORSPolicy(policy *bahamut.CORSPolicy) OptWS {
 	return func(cfg *wsCfg) {
 		cfg.corsPolicy = policy
+	}
+}
+
+// OptSBOM sets a the utils.SBOM to use to verify
+// server integrity.
+func OptSBOM(sbom utils.SBOM) OptWS {
+	return func(cfg *wsCfg) {
+		cfg.sbom = sbom
 	}
 }

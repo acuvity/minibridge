@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/policer"
+	"go.acuvity.ai/minibridge/pkgs/utils"
 	"go.acuvity.ai/tg/tglib"
 )
 
@@ -224,4 +225,22 @@ func mtlsMode(tlsCfg *tls.Config) string {
 	}
 
 	return tlsCfg.ClientAuth.String()
+}
+
+func makeSBOM() (utils.SBOM, error) {
+
+	sbomFile, _ := fSBOM.GetString("hashes")
+
+	if sbomFile == "" {
+		return utils.SBOM{}, nil
+	}
+
+	sbom, err := utils.LoadSBOM(sbomFile)
+	if err != nil {
+		return sbom, fmt.Errorf("unable load sbom file: %w", err)
+	}
+
+	slog.Info("SBOM configured", "tools", len(sbom.Tools))
+
+	return sbom, nil
 }

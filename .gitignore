@@ -2,3 +2,5 @@ minibridge
 dist
 *.pem
 *.token
+*.sbom
+unit_coverage.out

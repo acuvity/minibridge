@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -17,10 +18,15 @@ func main() {
 		cmd.Frontend,
 		cmd.AIO,
 		cmd.Completion,
+		cmd.Scan,
 	)
 
 	if err := cmd.Root.Execute(); err != nil {
-		slog.Error("Minibridge exited with error", "err", err)
+		if _, ok := slog.Default().Handler().(*slog.JSONHandler); ok {
+			slog.Error("Minibridge exited with error", "err", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "error: %s", err.Error())
+		}
 		os.Exit(1)
 	}
 }

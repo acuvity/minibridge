@@ -9,6 +9,13 @@ var (
 	CallTypeOutput  CallType = "response"
 )
 
+type ProtocolVersion string
+
+var (
+	ProtocolVersion20250326 ProtocolVersion = "2025-03-26"
+	ProtocolVersion20241105 ProtocolVersion = "2024-11-05"
+)
+
 // An MPCError represents an inline MPC error.
 type MCPError struct {
 	Code    int    `json:"code"`

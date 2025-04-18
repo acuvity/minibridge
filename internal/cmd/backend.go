@@ -25,6 +25,7 @@ func init() {
 	Backend.Flags().AddFlagSet(fHealth)
 	Backend.Flags().AddFlagSet(fProfiler)
 	Backend.Flags().AddFlagSet(fCORS)
+	Backend.Flags().AddFlagSet(fSBOM)
 }
 
 // Backend is the cobra command to run the server.
@@ -54,6 +55,11 @@ var Backend = &cobra.Command{
 			return fmt.Errorf("unable to make policer: %w", err)
 		}
 
+		sbom, err := makeSBOM()
+		if err != nil {
+			return fmt.Errorf("unable to make hashes: %w", err)
+		}
+
 		corsPolicy := makeCORSPolicy()
 
 		startHelperServers(cmd.Context())
@@ -74,6 +80,7 @@ var Backend = &cobra.Command{
 			backend.OptWSPolicer(policer),
 			backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
 			backend.OptWSCORSPolicy(corsPolicy),
+			backend.OptSBOM(sbom),
 		)
 
 		return proxy.Start(cmd.Context())
