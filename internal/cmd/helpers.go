@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/utils"
@@ -19,7 +20,7 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 
 	var hasTLS bool
 
-	skipVerify, _ := flags.GetBool("tls-client-insecure-skip-verify")
+	skipVerify := viper.GetBool("tls-client-insecure-skip-verify")
 
 	if skipVerify {
 		slog.Warn("Certificate validation deactivated. Connection will not be secure")
@@ -33,18 +34,18 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 	var certPath, keyPath, keyPass string
 
 	if flags.Name() == "tlsclient" {
-		certPath, _ = flags.GetString("tls-client-cert")
-		keyPath, _ = flags.GetString("tls-client-key")
-		keyPass, _ = flags.GetString("tls-client-key-pass")
+		certPath = viper.GetString("tls-client-cert")
+		keyPath = viper.GetString("tls-client-key")
+		keyPass = viper.GetString("tls-client-key-pass")
 	}
-	serverCAPath, _ := flags.GetString("tls-client-backend-ca")
+	serverCAPath := viper.GetString("tls-client-backend-ca")
 
 	if flags.Name() == "tlsserver" {
-		certPath, _ = flags.GetString("tls-server-cert")
-		keyPath, _ = flags.GetString("tls-server-key")
-		keyPass, _ = flags.GetString("tls-server-key-pass")
+		certPath = viper.GetString("tls-server-cert")
+		keyPath = viper.GetString("tls-server-key")
+		keyPass = viper.GetString("tls-server-key-pass")
 	}
-	clientCAPath, _ := flags.GetString("tls-server-client-ca")
+	clientCAPath := viper.GetString("tls-server-client-ca")
 
 	if certPath != "" && keyPath != "" {
 		x509Cert, x509Key, err := tglib.ReadCertificatePEM(certPath, keyPath, keyPass)
@@ -95,10 +96,10 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 
 func startHelperServers(ctx context.Context) bahamut.MetricsManager { // nolint: unparam
 
-	healthEnabled, _ := fHealth.GetBool("health-enable")
-	healthListen, _ := fHealth.GetString("health-listen")
-	profilingEnabled, _ := fProfiler.GetBool("profiling-enable")
-	profilingListen, _ := fProfiler.GetString("profiling-listen")
+	healthEnabled := viper.GetBool("health-enable")
+	healthListen := viper.GetString("health-listen")
+	profilingEnabled := viper.GetBool("profiling-enable")
+	profilingListen := viper.GetString("profiling-listen")
 
 	opts := []bahamut.Option{}
 	var metricsManager bahamut.MetricsManager
@@ -126,16 +127,16 @@ func startHelperServers(ctx context.Context) bahamut.MetricsManager { // nolint:
 
 func makePolicer() (policer.Policer, error) {
 
-	pType, _ := fPolicer.GetString("policer-type")
+	pType := viper.GetString("policer-type")
 
 	switch pType {
 
 	case "http":
 
-		httpCA, _ := fPolicer.GetString("policer-http-ca")
-		httpSkip, _ := fPolicer.GetBool("policer-http-insecure-skip-verify")
-		httpURL, _ := fPolicer.GetString("policer-http-url")
-		httpToken, _ := fPolicer.GetString("policer-http-token")
+		httpCA := viper.GetString("policer-http-ca")
+		httpSkip := viper.GetBool("policer-http-insecure-skip-verify")
+		httpURL := viper.GetString("policer-http-url")
+		httpToken := viper.GetString("policer-http-token")
 
 		if httpURL == "" {
 			return nil, fmt.Errorf("you must set --policer-http-url when using an http policer")
@@ -167,7 +168,7 @@ func makePolicer() (policer.Policer, error) {
 
 	case "rego":
 
-		regoFile, _ := fPolicer.GetString("policer-rego-policy")
+		regoFile := viper.GetString("policer-rego-policy")
 
 		if regoFile == "" {
 			return nil, fmt.Errorf("you must set --policer-rego-policy when using a rego policer")
@@ -193,7 +194,7 @@ func makePolicer() (policer.Policer, error) {
 
 func makeCORSPolicy() *bahamut.CORSPolicy {
 
-	origin, _ := fCORS.GetString("cors-origin")
+	origin := viper.GetString("cors-origin")
 
 	if origin == "mirror" {
 		origin = bahamut.CORSOriginMirror
@@ -229,7 +230,7 @@ func mtlsMode(tlsCfg *tls.Config) string {
 
 func makeSBOM() (utils.SBOM, error) {
 
-	sbomFile, _ := fSBOM.GetString("sbom")
+	sbomFile := viper.GetString("hashes")
 
 	if sbomFile == "" {
 		return utils.SBOM{}, nil
