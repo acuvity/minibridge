@@ -62,7 +62,7 @@ type Tools []Tool
 type Tool struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description,omitempty"`
-	InputSchema map[string]any `json:"InputSchema,omitempty"`
+	InputSchema map[string]any `json:"inputSchema,omitempty"`
 }
 
 type Resources []Resource
