@@ -40,41 +40,55 @@ var Scan = &cobra.Command{
 			return fmt.Errorf("unable to start MCP server: %w", err)
 		}
 
-		tools, err := utils.DumpTools(cmd.Context(), stream)
+		dump, err := utils.DumpAll(cmd.Context(), stream)
 		if err != nil {
 			return fmt.Errorf("unable to dump tools: %w", err)
 		}
 
-		toolHashes, err := utils.HashTools(tools)
+		toolHashes, err := utils.HashTools(dump.Tools)
 		if err != nil {
 			return fmt.Errorf("unable to hash tools: %w", err)
+		}
+
+		promptHashes, err := utils.HashPrompts(dump.Prompts)
+		if err != nil {
+			return fmt.Errorf("unable to hash prompts: %w", err)
+		}
+
+		sbom := utils.SBOM{
+			Tools:   toolHashes,
+			Prompts: promptHashes,
 		}
 
 		switch args[0] {
 
 		case "check":
 
-			sbom, err := utils.LoadSBOM(args[1])
+			refSBOM, err := utils.LoadSBOM(args[1])
 			if err != nil {
 				return fmt.Errorf("unable to load sbom: %w", err)
 			}
 
-			if err := sbom.Matches(utils.SBOM{Tools: toolHashes}); err != nil {
-				return fmt.Errorf("sbom does not match: %w", err)
+			if err := refSBOM.Tools.Matches(sbom.Tools); err != nil {
+				return fmt.Errorf("tools sbom does not match: %w", err)
+			}
+
+			if err := refSBOM.Prompts.Matches(sbom.Prompts); err != nil {
+				return fmt.Errorf("prompts sbom does not match: %w", err)
 			}
 
 		case "sbom":
 
-			d, _ := json.MarshalIndent(utils.SBOM{Tools: toolHashes}, "", "  ")
+			d, _ := json.MarshalIndent(sbom, "", "  ")
 			fmt.Println(string(d))
 
-		case "tools":
+		case "dump":
 
-			d, _ := json.MarshalIndent(tools, "", "  ")
+			d, _ := json.MarshalIndent(dump, "", "  ")
 			fmt.Println(string(d))
 
 		default:
-			return fmt.Errorf("first command must be either tools, sbom")
+			return fmt.Errorf("first command must be either dump, sbom or check")
 		}
 
 		return nil

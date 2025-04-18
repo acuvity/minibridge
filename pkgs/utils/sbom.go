@@ -1,27 +1,42 @@
 package utils
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+
+	"go.acuvity.ai/elemental"
+)
 
 // SBOM contains a list of hashes for hashable
 // resources.
 type SBOM struct {
-	Tools Hashes `json:"tools,omitzero"`
+	Tools   Hashes `json:"tools,omitzero"`
+	Prompts Hashes `json:"prompts,omitzero"`
 }
 
-// Matches return nil if both received and o
-// match, meaning len are identical, and all hashes
-// on h match hashes on o.
-func (h SBOM) Matches(o SBOM) error {
+func LoadSBOM(path string) (sbom SBOM, err error) {
 
-	if err := cmpH(h.Tools, o.Tools); err != nil {
-		return fmt.Errorf("invalid tool: %w", err)
+	data, err := os.ReadFile(path) // #nosec: G304
+	if err != nil {
+		return sbom, fmt.Errorf("unable to load sbom file at '%s': %w", path, err)
 	}
 
-	return nil
+	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &sbom); err != nil {
+		return sbom, fmt.Errorf("unable to decode content of sbom file: %w", err)
+	}
+
+	return sbom, nil
 }
 
 // Hashes are a list of Hash.
 type Hashes []Hash
+
+// Matches return nil if both receiver and o
+// match, meaning len are identical, and all hashes
+// on h match hashes on o.
+func (h Hashes) Matches(o Hashes) error {
+	return cmpH(h, o)
+}
 
 // Map converts the Hashes into a map[string]Hash keyed by the Hash Name.
 func (l Hashes) Map() map[string]Hash {

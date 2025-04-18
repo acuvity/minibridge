@@ -6,12 +6,12 @@ import (
 
 func TestSBOM_Matches(t *testing.T) {
 	type args struct {
-		o SBOM
+		o Hashes
 	}
 	tests := []struct {
 		name    string
-		init    func(t *testing.T) SBOM
-		inspect func(r SBOM, t *testing.T) //inspects receiver after test run
+		init    func(t *testing.T) Hashes
+		inspect func(r Hashes, t *testing.T) //inspects receiver after test run
 
 		args func(t *testing.T) args
 
@@ -20,9 +20,24 @@ func TestSBOM_Matches(t *testing.T) {
 	}{
 		{
 			"matching",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
+							},
+						},
+					},
+				}
+			},
+			nil,
+			func(*testing.T) args {
+				return args{
+					Hashes{
 						{
 							Name: "a1",
 							Hash: "ah1",
@@ -36,49 +51,26 @@ func TestSBOM_Matches(t *testing.T) {
 					},
 				}
 			},
-			nil,
-			func(*testing.T) args {
-				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "a1",
-								Hash: "ah1",
-								Params: Hashes{
-									{
-										Name: "p1",
-										Hash: "ph1",
-									},
-								},
-							},
-						},
-					},
-				}
-			},
 			false,
 			nil,
 		},
 		{
 			"no params",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
-						{
-							Name: "a1",
-							Hash: "ah1",
-						},
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
 					},
 				}
 			},
 			nil,
 			func(*testing.T) args {
 				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "a1",
-								Hash: "ah1",
-							},
+					Hashes{
+						{
+							Name: "a1",
+							Hash: "ah1",
 						},
 					},
 				}
@@ -88,13 +80,13 @@ func TestSBOM_Matches(t *testing.T) {
 		},
 		{
 			"empty",
-			func(t *testing.T) SBOM {
-				return SBOM{}
+			func(t *testing.T) Hashes {
+				return Hashes{}
 			},
 			nil,
 			func(*testing.T) args {
 				return args{
-					SBOM{},
+					Hashes{},
 				}
 			},
 			false,
@@ -102,9 +94,70 @@ func TestSBOM_Matches(t *testing.T) {
 		},
 		{
 			"missing param",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
+							},
+							{
+								Name: "p2",
+								Hash: "ph2",
+							},
+						},
+					},
+				}
+			},
+			nil,
+			func(*testing.T) args {
+				return args{
+					Hashes{
+						{
+							Name: "a1",
+							Hash: "ah1",
+							Params: Hashes{
+								{
+									Name: "p1",
+									Hash: "ph1",
+								},
+							},
+						},
+					},
+				}
+			},
+			true,
+			func(err error, t *testing.T) {
+				want := "'a1': invalid param: invalid len. left: 2 right: 1"
+				if err.Error() != want {
+					t.Logf("invalid err. want: %s got: %s", want, err.Error())
+					t.Fail()
+				}
+			},
+		},
+		{
+			"extra param",
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
+							},
+						},
+					},
+				}
+			},
+			nil,
+			func(*testing.T) args {
+				return args{
+					Hashes{
 						{
 							Name: "a1",
 							Hash: "ah1",
@@ -122,28 +175,9 @@ func TestSBOM_Matches(t *testing.T) {
 					},
 				}
 			},
-			nil,
-			func(*testing.T) args {
-				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "a1",
-								Hash: "ah1",
-								Params: Hashes{
-									{
-										Name: "p1",
-										Hash: "ph1",
-									},
-								},
-							},
-						},
-					},
-				}
-			},
 			true,
 			func(err error, t *testing.T) {
-				want := "invalid tool: 'a1': invalid param: invalid len. left: 2 right: 1"
+				want := "'a1': invalid param: invalid len. left: 1 right: 2"
 				if err.Error() != want {
 					t.Logf("invalid err. want: %s got: %s", want, err.Error())
 					t.Fail()
@@ -151,10 +185,35 @@ func TestSBOM_Matches(t *testing.T) {
 			},
 		},
 		{
-			"extra param",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
+			"missing tool",
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
+							},
+						},
+					},
+					{
+						Name: "a2",
+						Hash: "ah2",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
+							},
+						},
+					},
+				}
+			},
+			nil,
+			func(*testing.T) args {
+				return args{
+					Hashes{
 						{
 							Name: "a1",
 							Hash: "ah1",
@@ -168,32 +227,9 @@ func TestSBOM_Matches(t *testing.T) {
 					},
 				}
 			},
-			nil,
-			func(*testing.T) args {
-				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "a1",
-								Hash: "ah1",
-								Params: Hashes{
-									{
-										Name: "p1",
-										Hash: "ph1",
-									},
-									{
-										Name: "p2",
-										Hash: "ph2",
-									},
-								},
-							},
-						},
-					},
-				}
-			},
 			true,
 			func(err error, t *testing.T) {
-				want := "invalid tool: 'a1': invalid param: invalid len. left: 1 right: 2"
+				want := "invalid len. left: 2 right: 1"
 				if err.Error() != want {
 					t.Logf("invalid err. want: %s got: %s", want, err.Error())
 					t.Fail()
@@ -201,10 +237,25 @@ func TestSBOM_Matches(t *testing.T) {
 			},
 		},
 		{
-			"missing tool",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
+			"extra tool",
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
+							},
+						},
+					},
+				}
+			},
+			nil,
+			func(*testing.T) args {
+				return args{
+					Hashes{
 						{
 							Name: "a1",
 							Hash: "ah1",
@@ -228,84 +279,9 @@ func TestSBOM_Matches(t *testing.T) {
 					},
 				}
 			},
-			nil,
-			func(*testing.T) args {
-				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "a1",
-								Hash: "ah1",
-								Params: Hashes{
-									{
-										Name: "p1",
-										Hash: "ph1",
-									},
-								},
-							},
-						},
-					},
-				}
-			},
 			true,
 			func(err error, t *testing.T) {
-				want := "invalid tool: invalid len. left: 2 right: 1"
-				if err.Error() != want {
-					t.Logf("invalid err. want: %s got: %s", want, err.Error())
-					t.Fail()
-				}
-			},
-		},
-		{
-			"extra tool",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
-						{
-							Name: "a1",
-							Hash: "ah1",
-							Params: Hashes{
-								{
-									Name: "p1",
-									Hash: "ph1",
-								},
-							},
-						},
-					},
-				}
-			},
-			nil,
-			func(*testing.T) args {
-				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "a1",
-								Hash: "ah1",
-								Params: Hashes{
-									{
-										Name: "p1",
-										Hash: "ph1",
-									},
-								},
-							},
-							{
-								Name: "a2",
-								Hash: "ah2",
-								Params: Hashes{
-									{
-										Name: "p1",
-										Hash: "ph1",
-									},
-								},
-							},
-						},
-					},
-				}
-			},
-			true,
-			func(err error, t *testing.T) {
-				want := "invalid tool: invalid len. left: 1 right: 2"
+				want := "invalid len. left: 1 right: 2"
 				if err.Error() != want {
 					t.Logf("invalid err. want: %s got: %s", want, err.Error())
 					t.Fail()
@@ -314,12 +290,27 @@ func TestSBOM_Matches(t *testing.T) {
 		},
 		{
 			"invalid tool hash",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
+							},
+						},
+					},
+				}
+			},
+			nil,
+			func(*testing.T) args {
+				return args{
+					Hashes{
 						{
 							Name: "a1",
-							Hash: "ah1",
+							Hash: "NOT_ah1",
 							Params: Hashes{
 								{
 									Name: "p1",
@@ -330,28 +321,9 @@ func TestSBOM_Matches(t *testing.T) {
 					},
 				}
 			},
-			nil,
-			func(*testing.T) args {
-				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "a1",
-								Hash: "NOT_ah1",
-								Params: Hashes{
-									{
-										Name: "p1",
-										Hash: "ph1",
-									},
-								},
-							},
-						},
-					},
-				}
-			},
 			true,
 			func(err error, t *testing.T) {
-				want := "invalid tool: 'a1': hash mismatch"
+				want := "'a1': hash mismatch"
 				if err.Error() != want {
 					t.Logf("invalid err. want: %s got: %s", want, err.Error())
 					t.Fail()
@@ -360,17 +332,15 @@ func TestSBOM_Matches(t *testing.T) {
 		},
 		{
 			"invalid param hash",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
-						{
-							Name: "a1",
-							Hash: "ah1",
-							Params: Hashes{
-								{
-									Name: "p1",
-									Hash: "ph1",
-								},
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
 							},
 						},
 					},
@@ -379,16 +349,14 @@ func TestSBOM_Matches(t *testing.T) {
 			nil,
 			func(*testing.T) args {
 				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "a1",
-								Hash: "ah1",
-								Params: Hashes{
-									{
-										Name: "p1",
-										Hash: "NOT-ph1",
-									},
+					Hashes{
+						{
+							Name: "a1",
+							Hash: "ah1",
+							Params: Hashes{
+								{
+									Name: "p1",
+									Hash: "NOT-ph1",
 								},
 							},
 						},
@@ -397,7 +365,7 @@ func TestSBOM_Matches(t *testing.T) {
 			},
 			true,
 			func(err error, t *testing.T) {
-				want := "invalid tool: 'a1': invalid param: 'p1': hash mismatch"
+				want := "'a1': invalid param: 'p1': hash mismatch"
 				if err.Error() != want {
 					t.Logf("invalid err. want: %s got: %s", want, err.Error())
 					t.Fail()
@@ -406,12 +374,27 @@ func TestSBOM_Matches(t *testing.T) {
 		},
 		{
 			"tool name missing",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
+							},
+						},
+					},
+				}
+			},
+			nil,
+			func(*testing.T) args {
+				return args{
+					Hashes{
 						{
-							Name: "a1",
-							Hash: "ah1",
+							Name: "b1",
+							Hash: "bh1",
 							Params: Hashes{
 								{
 									Name: "p1",
@@ -422,28 +405,9 @@ func TestSBOM_Matches(t *testing.T) {
 					},
 				}
 			},
-			nil,
-			func(*testing.T) args {
-				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "b1",
-								Hash: "bh1",
-								Params: Hashes{
-									{
-										Name: "p1",
-										Hash: "ph1",
-									},
-								},
-							},
-						},
-					},
-				}
-			},
 			true,
 			func(err error, t *testing.T) {
-				want := "invalid tool: 'a1': missing"
+				want := "'a1': missing"
 				if err.Error() != want {
 					t.Logf("invalid err. want: %s got: %s", want, err.Error())
 					t.Fail()
@@ -452,17 +416,15 @@ func TestSBOM_Matches(t *testing.T) {
 		},
 		{
 			"param name missing left",
-			func(t *testing.T) SBOM {
-				return SBOM{
-					Tools: Hashes{
-						{
-							Name: "a1",
-							Hash: "ah1",
-							Params: Hashes{
-								{
-									Name: "p1",
-									Hash: "ph1",
-								},
+			func(t *testing.T) Hashes {
+				return Hashes{
+					{
+						Name: "a1",
+						Hash: "ah1",
+						Params: Hashes{
+							{
+								Name: "p1",
+								Hash: "ph1",
 							},
 						},
 					},
@@ -471,16 +433,14 @@ func TestSBOM_Matches(t *testing.T) {
 			nil,
 			func(*testing.T) args {
 				return args{
-					SBOM{
-						Tools: Hashes{
-							{
-								Name: "a1",
-								Hash: "ah1",
-								Params: Hashes{
-									{
-										Name: "q1",
-										Hash: "qh1",
-									},
+					Hashes{
+						{
+							Name: "a1",
+							Hash: "ah1",
+							Params: Hashes{
+								{
+									Name: "q1",
+									Hash: "qh1",
 								},
 							},
 						},
@@ -489,7 +449,7 @@ func TestSBOM_Matches(t *testing.T) {
 			},
 			true,
 			func(err error, t *testing.T) {
-				want := "invalid tool: 'a1': invalid param: 'p1': missing"
+				want := "'a1': invalid param: 'p1': missing"
 				if err.Error() != want {
 					t.Logf("invalid err. want: %s got: %s", want, err.Error())
 					t.Fail()

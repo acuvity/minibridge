@@ -23,7 +23,7 @@ SBOM (Software Bill of Materials) generation and real-time validation.
   * [Generate SBOM](#generate-sbom)
   * [Check SBOM Offline](#check-sbom-offline)
   * [Check SBOM Online](#check-sbom-online)
-  * [List Tools](#list-tools)
+  * [Dump everything](#dump-everything)
 * [Policer](#policer)
   * [Policer API](#policer-api)
     * [Police Request](#police-request)
@@ -235,7 +235,7 @@ To generate a SBOM file:
 This will create `server.sbom` that contains all the hashes of the relevant
 parts.
 
-> NOTE: For now, only tools are part of the SBOM.
+> NOTE: For now, only tools and prompts are part of the SBOM.
 
 ### Check SBOM Offline
 
@@ -255,13 +255,14 @@ To start Minibridge backend with live SBOM validation:
 
     minibridge backend -l :8000 --sbom server.sbom -- npx @modelcontextprotocol/server-everything
 
-### List Tools
+### Dump everything
 
-Dump all the tools of a particular MCP Server.
+Dump all the tools, prompts, resources and resource templates of a particular
+MCP Server.
 
 For example:
 
-    minibridge scan tools -- npx @modelcontextprotocol/server-everything
+    minibridge scan dump -- npx @modelcontextprotocol/server-everything
 
 ## Policer
 

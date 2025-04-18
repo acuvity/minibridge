@@ -261,8 +261,7 @@ func policeData(ctx context.Context, pol policer.Policer, hashes utils.SBOM, typ
 		return nil, fmt.Errorf("unable to decode mcp call: %w", err)
 	}
 
-	// this is tools response, if we have hashes, will will
-	// run a comparison.
+	// This is tools/list response, if we have hashes for them, we verify their integrity.
 	if dtools, ok := call.Result["tools"]; ok && len(hashes.Tools) > 0 {
 
 		tools := api.Tools{}
@@ -275,7 +274,25 @@ func policeData(ctx context.Context, pol policer.Policer, hashes utils.SBOM, typ
 			return nil, fmt.Errorf("unable to hash tools result: %w", err)
 		}
 
-		if err := hashes.Matches(utils.SBOM{Tools: lhashes}); err != nil {
+		if err := hashes.Tools.Matches(lhashes); err != nil {
+			return makeMCPError(call.ID, err), fmt.Errorf("%w: %w", api.ErrBlocked, err)
+		}
+	}
+
+	// This is prompts/list response, if we have hashes for them, we verify their integrity.
+	if dtools, ok := call.Result["prompts"]; ok && len(hashes.Prompts) > 0 {
+
+		prompts := api.Prompts{}
+		if err := mapstructure.Decode(dtools, &prompts); err != nil {
+			return nil, fmt.Errorf("unable to decode prompts result for hashing: %w", err)
+		}
+
+		lhashes, err := utils.HashPrompts(prompts)
+		if err != nil {
+			return nil, fmt.Errorf("unable to hash prompts result: %w", err)
+		}
+
+		if err := hashes.Prompts.Matches(lhashes); err != nil {
 			return makeMCPError(call.ID, err), fmt.Errorf("%w: %w", api.ErrBlocked, err)
 		}
 	}

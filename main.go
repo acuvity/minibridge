@@ -25,7 +25,7 @@ func main() {
 		if _, ok := slog.Default().Handler().(*slog.JSONHandler); ok {
 			slog.Error("Minibridge exited with error", "err", err)
 		} else {
-			fmt.Fprintf(os.Stderr, "error: %s", err.Error())
+			fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
 		}
 		os.Exit(1)
 	}
