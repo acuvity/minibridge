@@ -230,7 +230,7 @@ func mtlsMode(tlsCfg *tls.Config) string {
 
 func makeSBOM() (utils.SBOM, error) {
 
-	sbomFile := viper.GetString("hashes")
+	sbomFile := viper.GetString("sbom")
 
 	if sbomFile == "" {
 		return utils.SBOM{}, nil
@@ -241,7 +241,10 @@ func makeSBOM() (utils.SBOM, error) {
 		return sbom, fmt.Errorf("unable load sbom file: %w", err)
 	}
 
-	slog.Info("SBOM configured", "tools", len(sbom.Tools))
+	slog.Info("SBOM configured",
+		"tools", len(sbom.Tools),
+		"prompts", len(sbom.Prompts),
+	)
 
 	return sbom, nil
 }
