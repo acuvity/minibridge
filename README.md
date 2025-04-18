@@ -370,34 +370,33 @@ To disallow the request or response:
 For example, a policy result that denies the request:
 
 ```http
-HTTP/2.0 200 OK
+HTTP/1.1 200 OK
 
-{
-  "deny": ["You are not allowed to list the tools"]
-}
+
+{ "deny": ["You are not allowed to list the tools"] }
 ```
 
 And a policy result that permits the request:
 
 ```http
-HTTP/2.0 204 No Content
+HTTP/1.1 204 No Content
 ```
 
 Or
 
 ```http
-HTTP/2.0 200 OK
+HTTP/1.1 200 OK
 
-{
-  "deny": [],
-}
+
+{ "deny": [] }
 ```
 
 The HTTP Policer can also decide to mutate the MCP call. To do so, it must allow
 the request, and pass back a modified MCP call:
 
 ```http
-HTTP/2.0 200 OK
+HTTP/1.1 200 OK
+
 
 {
   "mcp": {
