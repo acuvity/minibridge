@@ -1,4 +1,4 @@
-# minibridge
+# Minibridge
 
 Minibridge serves as a bridge between MCP servers and the outside world. It
 functions as a backend-to-frontend connector, facilitating communication between
@@ -19,6 +19,11 @@ the MCP protocol.
 * [Frontend](#frontend)
   * [Stdio](#stdio)
   * [HTTP+SSE](#httpsse)
+* [MCP Server Integrity Check](#mcp-server-integrity-check)
+  * [Generate SBOM](#generate-sbom)
+  * [Check SBOM Offline](#check-sbom-offline)
+  * [Check SBOM Online](#check-sbom-online)
+  * [List Tools](#list-tools)
 * [Policer](#policer)
   * [Policer API](#policer-api)
     * [Police Request](#police-request)
@@ -40,7 +45,7 @@ stdio-based MCP server.
 
 To start everything as a single process, run:
 
-    minibridge aio --listen :8000 -- npx -y @modelcontextprotocol/server-filesystem /tmp
+    minibridge aio --listen :8000 -- npx @modelcontextprotocol/server-filesystem /tmp
 
 This command launches both the frontend and backend within a single process,
 which can be useful in certain scenarios.
@@ -70,7 +75,7 @@ connections:
       --tls-server-cert ./server-cert.pem \
       --tls-server-key ./server-key.pem \
       --tls-server-client-ca ./clients-ca.pem \
-      -- npx -y @modelcontextprotocol/server-filesystem /tmp
+      -- npx @modelcontextprotocol/server-filesystem /tmp
 
 This enables HTTPS and with `--tls-server-client-ca`, it requires the clients to
 send a certificate signed by that client CA.
@@ -95,15 +100,15 @@ certificates, depending on your security requirements.
 
 For example, to start a filesystem-based MCP server:
 
-    minibridge backend -- npx -y @modelcontextprotocol/server-filesystem /tmp
+    minibridge backend -- npx @modelcontextprotocol/server-filesystem /tmp
 
 You can now connect directly using a websocket client:
 
     wscat --connect ws://127.0.0.1:8000/ws
 
-> NOTE: use the `wss` scheme if you have started minibridge backend with TLS.
+> NOTE: use the `wss` scheme if you have started Minibridge backend with TLS.
 
-> NOTE: Today, minibridge backend only supports MCP server over stdio.
+> NOTE: Today, Minibridge backend only supports MCP server over stdio.
 
 The flow will look like the following:
 
@@ -120,7 +125,7 @@ connections:
       --tls-server-cert ./backend-server-cert.pem \
       --tls-server-key ./backend-server-key.pem \
       --tls-server-client-ca ./clients-ca.pem \
-      -- npx -y @modelcontextprotocol/server-filesystem /tmp
+      -- npx @modelcontextprotocol/server-filesystem /tmp
 
 This enables HTTPS and with `--tls-server-client-ca`, it requires the clients to
 send a certificate signed by that client CA. You can now connect using:
@@ -135,7 +140,7 @@ While WebSockets address many of the limitations of plain POST+SSE, they are not
 yet part of the official MCP protocol. To maintain backward compatibility with
 existing agents, the frontend can expose a local interface using POST+SSE,
 HTTP+STREAM (coming soon), or plain STDIO. It will then transparently forward
-the data to the Minibridge backend over WebSockets and HTTPS.
+the data to the Mminibridge backend over WebSockets and HTTPS.
 
 ### Stdio
 
@@ -214,6 +219,50 @@ You can now connect directly using an HTTP client:
       -X POST \
       -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 
+## MCP Server Integrity Check
+
+Minibridge can generate an SBOM file for a MCP server that contains hashes of
+various parts interpreted by an LLM. This SBOM file can be used to check the MCP
+Server did not change, either offline or online by passing it to the backend
+that will inspect each relevant MCP call dynamically.
+
+### Generate SBOM
+
+To generate a SBOM file:
+
+    minibridge scan sbom -- npx @modelcontextprotocol/server-everything > server.sbom
+
+This will create `server.sbom` that contains all the hashes of the relevant
+parts.
+
+> NOTE: For now, only tools are part of the SBOM.
+
+### Check SBOM Offline
+
+To verify that an MCP server still matches a previously generated SBOM file:
+
+    minibridge scan check server.sbom -- npx @modelcontextprotocol/server-everything
+
+### Check SBOM Online
+
+The SBOM file can be passed to the Minibridge backend to dynamically ensure no
+LLM-interpreted parts have changed since the SBOM file generation.
+
+For instance, it can make sure a tool that reads a file does not
+suddenly change to a tool that sends all your credentials to some shady place.
+
+To start Minibridge backend with live SBOM validation:
+
+    minibridge backend -l :8000 --sbom server.sbom -- npx @modelcontextprotocol/server-everything > server.sbom
+
+### List Tools
+
+Dump all the tools of a particular MCP Server.
+
+For example:
+
+    minibridge scan tools -- npx @modelcontextprotocol/server-everything
+
 ## Policer
 
 While Minibridge already offers advanced features such as strong client
@@ -226,7 +275,7 @@ integration with a Policer. A Policer is responsible for:
 * Full request tracing
 * And more advanced policy-based controls
 
-There are various available policers in minibridge:
+There are various available policers in Minibridge:
 
 - HTTP policer: sends a request to a remote HTTP service to delegate decision
 - Rego policer: runs a [rego](https://www.openpolicyagent.org/docs/latest)
@@ -289,7 +338,7 @@ The policer must return a response with the following information:
 ```
 
 If `deny` is set an not empty, then the request or response is considered as
-blocked and minibridge will not forward it to the MCP server or to the Agent.
+blocked and Minibridge will not forward it to the MCP server or to the Agent.
 Instead, it will return a descriptive MCP error containing the deny reasons, to
 the caller.
 
