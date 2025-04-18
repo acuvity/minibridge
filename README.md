@@ -1,14 +1,14 @@
 # Minibridge
 
-Minibridge serves as a bridge between MCP servers and the outside world. It
-functions as a backend-to-frontend connector, facilitating communication between
-Agents and MCP servers. It allows to securely exposes MCP servers to the internet and
-optionally enables seamless integration with a generic policing service for
-agent authentication and content analysis.
+Minibridge serves as a backend-to-frontend bridge, streamlining and securing
+communication between Agents and MCP servers. It safely exposes MCP servers to
+the internet and can optionally integrate with generic policing services — known
+as Policers — for agent authentication, content analysis, and transformation.
+Policers can be implemented remotely via HTTP or locally using OPA Rego
+policies.
 
-Minibridge does not need to interpret the core MCP protocol, as it only handles
-data streams. This design ensures forward compatibility with future changes to
-the MCP protocol.
+Additionally, Minibridge can help ensure the integrity of MCP servers through
+SBOM (Software Bill of Materials) generation and real-time validation.
 
 ## Table of Content
 
