@@ -18,8 +18,8 @@ func init() {
 
 // Scan is the cobra command to run the server.
 var Scan = &cobra.Command{
-	Use:              "scan [tools|sbom|check file.sbom] -- command [args...]",
-	Short:            "Scan a MCP server and extract a reference file",
+	Use:              "scan [dump|sbom|check file.sbom] -- command [args...]",
+	Short:            "Scan an MCP server for resources, prompts, etc and generate sbom",
 	SilenceUsage:     true,
 	SilenceErrors:    true,
 	TraverseChildren: true,
