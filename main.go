@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -21,7 +22,10 @@ func main() {
 		cmd.Scan,
 	)
 
-	if err := cmd.Root.Execute(); err != nil {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := cmd.Root.ExecuteContext(ctx); err != nil {
 		if _, ok := slog.Default().Handler().(*slog.JSONHandler); ok {
 			slog.Error("Minibridge exited with error", "err", err)
 		} else {

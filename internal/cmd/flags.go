@@ -42,7 +42,7 @@ func initSharedFlagSet() {
 	fProfiler.String("profiling-listen", ":6060", "listen address of the health server.")
 	fProfiler.Bool("profiling-enable", false, "enables profiling server.")
 
-	fPolicer.StringP("policer-type", "P", "", "type of policer to use. use --policer-list to list all of them.")
+	fPolicer.StringP("policer-type", "P", "", "type of policer to use. 'rego' or 'http'.")
 	fPolicer.String("policer-rego-policy", "", "path to a rego policy file for the rego policer.")
 	fPolicer.String("policer-http-url", "", "URL of the HTTP policer to POST agent policing requests.")
 	fPolicer.String("policer-http-token", "", "token to use to authenticate against the HTTP policer.")

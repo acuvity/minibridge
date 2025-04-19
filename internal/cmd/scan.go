@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -35,7 +36,11 @@ var Scan = &cobra.Command{
 		}
 
 		client := client.NewStdio(mcpServer)
-		stream, err := client.Start(cmd.Context())
+
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
+
+		stream, err := client.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to start MCP server: %w", err)
 		}
@@ -44,6 +49,8 @@ var Scan = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("unable to dump tools: %w", err)
 		}
+
+		cancel()
 
 		toolHashes, err := utils.HashTools(dump.Tools)
 		if err != nil {
