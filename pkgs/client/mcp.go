@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -34,10 +33,6 @@ func (s *MCPStream) Send(call api.MCPCall) error {
 		return fmt.Errorf("unable to encode mcp call: %w", err)
 	}
 
-	if !bytes.HasPrefix(data, []byte{'\n'}) {
-		data = append(data, '\n')
-	}
-
 	s.Stdin <- data
 
 	return nil
@@ -56,10 +51,8 @@ func (s *MCPStream) Read(ctx context.Context) (api.MCPCall, error) {
 		return call, ctx.Err()
 	}
 
-	data = bytes.TrimRight(data, "\n")
-
 	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
-		return call, fmt.Errorf("unable to decode mcp call: %w", err)
+		return call, fmt.Errorf("read: unable to decode mcp call: %w", err)
 	}
 
 	return call, nil

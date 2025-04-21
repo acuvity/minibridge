@@ -2,7 +2,6 @@ package frontend
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -10,8 +9,9 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
-	"strings"
 	"time"
+
+	"go.acuvity.ai/minibridge/pkgs/data"
 )
 
 type stdioFrontend struct {
@@ -121,13 +121,11 @@ func (p *stdioFrontend) wspump(ctx context.Context) error {
 
 				select {
 
-				case data := <-p.wsWrite:
-					session.Write(data)
+				case buf := <-p.wsWrite:
+					session.Write(data.Sanitize(buf))
 
-				case data := <-session.Read():
-					if len(data) > 0 {
-						fmt.Println(strings.TrimRight(string(data), "\n"))
-					}
+				case buf := <-session.Read():
+					fmt.Println(string(data.Sanitize(buf)))
 
 				case err := <-session.Error():
 					failures++
@@ -158,7 +156,7 @@ func (p *stdioFrontend) stdiopump(ctx context.Context) {
 
 		default:
 
-			data, err := stdin.ReadBytes('\n')
+			buf, err := stdin.ReadBytes('\n')
 
 			if err != nil {
 				if err != io.EOF {
@@ -167,15 +165,11 @@ func (p *stdioFrontend) stdiopump(ctx context.Context) {
 				continue
 			}
 
-			if len(data) == 0 {
+			if len(buf) == 0 {
 				continue
 			}
 
-			if !bytes.HasSuffix(data, []byte("\n")) {
-				data = append(data, '\n')
-			}
-
-			p.wsWrite <- data
+			p.wsWrite <- data.Sanitize(buf)
 
 		case <-ctx.Done():
 			return

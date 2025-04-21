@@ -1,7 +1,6 @@
 package backend
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/base64"
@@ -21,6 +20,7 @@ import (
 	"go.acuvity.ai/elemental"
 	"go.acuvity.ai/minibridge/pkgs/client"
 	"go.acuvity.ai/minibridge/pkgs/cors"
+	"go.acuvity.ai/minibridge/pkgs/data"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/utils"
@@ -104,7 +104,7 @@ func (p *wsBackend) Start(ctx context.Context) error {
 
 func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
-	if !cors.HandleGenericHeaders(w, req, p.cfg.corsPolicy) {
+	if !cors.HandleCORS(w, req, p.cfg.corsPolicy) {
 		return
 	}
 
@@ -163,37 +163,35 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		select {
 
-		case data := <-session.Read():
+		case buf := <-session.Read():
 
-			slog.Debug("Received data from websocket", "msg", string(data))
+			slog.Debug("Received data from websocket", "msg", string(buf))
 
-			data, err = policeData(ctx, p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, data)
-			if err != nil {
+			if buf, err = policeData(ctx, p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, buf); err != nil {
 				if errors.Is(err, api.ErrBlocked) {
-					session.Write(sanitizeData(data))
+					session.Write(data.Sanitize(buf))
 					continue
 				}
 				slog.Error("Unable to police request", err)
 				continue
 			}
 
-			stream.Stdin <- sanitizeData(data)
+			stream.Stdin <- data.Sanitize(buf)
 
-		case data := <-stream.Stdout:
+		case buf := <-stream.Stdout:
 
-			slog.Debug("Received data from MCP Server", "msg", string(data))
+			slog.Debug("Received data from MCP Server", "msg", string(buf))
 
-			data, err = policeData(ctx, p.cfg.policer, p.cfg.sbom, api.CallTypeOutput, agent, data)
-			if err != nil {
+			if buf, err = policeData(ctx, p.cfg.policer, p.cfg.sbom, api.CallTypeOutput, agent, buf); err != nil {
 				if errors.Is(err, api.ErrBlocked) {
-					session.Write(sanitizeData(data))
+					session.Write(data.Sanitize(buf))
 					continue
 				}
 				slog.Error("Unable to police response", err)
 				continue
 			}
 
-			session.Write(sanitizeData(data))
+			session.Write(data.Sanitize(buf))
 
 		case data := <-stream.Stderr:
 			_, _ = rb.Write(data)
@@ -251,19 +249,6 @@ func parseBasicAuth(auth string) (password string, ok bool) {
 	}
 
 	return password, true
-}
-
-func sanitizeData(data []byte) []byte {
-
-	if bytes.HasSuffix(data, []byte{'\n', '\n'}) {
-		return data
-	}
-
-	if bytes.HasSuffix(data, []byte{'\n'}) {
-		return append(data, '\n')
-	}
-
-	return append(data, '\n', '\n')
 }
 
 func policeData(ctx context.Context, pol policer.Policer, hashes utils.SBOM, typ api.CallType, agent api.Agent, data []byte) ([]byte, error) {

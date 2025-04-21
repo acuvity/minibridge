@@ -14,6 +14,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"go.acuvity.ai/minibridge/pkgs/cors"
+	"go.acuvity.ai/minibridge/pkgs/data"
 	"go.acuvity.ai/wsc"
 )
 
@@ -188,15 +189,15 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 			log.Debug("Client is gone")
 			return
 
-		case data := <-ws.Read():
+		case buf := <-ws.Read():
 
-			if len(data) == 0 {
+			if len(buf) == 0 {
 				continue
 			}
 
-			log.Debug("Received data from backend", "data", string(data))
+			log.Debug("Received data from backend", "data", string(buf))
 
-			if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n", string(data)); err != nil {
+			if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", string(data.Sanitize(buf))); err != nil {
 				log.Error("Unable to write event", err)
 				continue
 			}
@@ -244,14 +245,14 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	data, err := io.ReadAll(req.Body)
+	buf, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to read body: %s", err), http.StatusBadRequest)
 		return
 	}
 	defer func() { _ = req.Body.Close() }()
 
-	log.Debug("Message data", "msg", string(data))
+	log.Debug("Message data", "msg", string(buf))
 
 	if req.Proto == "HTTP/1.1" {
 		w.Header().Add("Connection", "keep-alive")
@@ -260,14 +261,14 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 	w.Header().Add("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusAccepted)
 
-	session.ws.Write(data)
+	session.ws.Write(data.Sanitize(buf))
 }
 
 // ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
 // you can use this function directly into your own *http.Server.
 func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
-	if !cors.HandleGenericHeaders(w, req, p.cfg.corsPolicy) {
+	if !cors.HandleCORS(w, req, p.cfg.corsPolicy) {
 		return
 	}
 

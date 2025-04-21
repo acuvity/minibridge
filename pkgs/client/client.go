@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+
+	"go.acuvity.ai/minibridge/pkgs/data"
 )
 
 type stdioClient struct {
@@ -78,8 +80,8 @@ func (c *stdioClient) readRequests(ctx context.Context, stdin io.WriteCloser, ch
 		select {
 		case <-ctx.Done():
 			return
-		case data := <-ch:
-			if _, err := stdin.Write(data); err != nil {
+		case buf := <-ch:
+			if _, err := stdin.Write(append(data.Sanitize(buf), '\n')); err != nil {
 				slog.Error("Unable to write data to stdin", "err", err)
 				return
 			}
@@ -91,7 +93,7 @@ func (c *stdioClient) readResponses(ctx context.Context, stdout io.ReadCloser, c
 
 	bstdout := bufio.NewReader(stdout)
 	for {
-		data, err := bstdout.ReadBytes('\n')
+		buf, err := bstdout.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
 				slog.Error("Unable to read response from stdout", "err", err)
@@ -99,7 +101,7 @@ func (c *stdioClient) readResponses(ctx context.Context, stdout io.ReadCloser, c
 			return
 		}
 		select {
-		case ch <- data:
+		case ch <- data.Sanitize(buf):
 		case <-ctx.Done():
 			return
 		}
@@ -110,7 +112,7 @@ func (c *stdioClient) readErrors(ctx context.Context, stderr io.ReadCloser, ch c
 
 	bstderr := bufio.NewReader(stderr)
 	for {
-		line, err := bstderr.ReadBytes('\n')
+		buf, err := bstderr.ReadBytes('\n')
 		if err != nil {
 			if err != io.EOF {
 				slog.Error("Unable to read error response from stderr", "err", err)
@@ -118,7 +120,7 @@ func (c *stdioClient) readErrors(ctx context.Context, stderr io.ReadCloser, ch c
 			return
 		}
 		select {
-		case ch <- line:
+		case ch <- data.Sanitize(buf):
 		case <-ctx.Done():
 			return
 		}

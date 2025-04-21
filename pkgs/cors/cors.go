@@ -6,8 +6,8 @@ import (
 	"go.acuvity.ai/bahamut"
 )
 
-// HandleGenericHeaders injects generic security headers and CORS
-func HandleGenericHeaders(w http.ResponseWriter, req *http.Request, corsPolicy *bahamut.CORSPolicy) bool {
+// HandleCORS handles CORS for browsers.
+func HandleCORS(w http.ResponseWriter, req *http.Request, corsPolicy *bahamut.CORSPolicy) bool {
 
 	w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
 	w.Header().Set("X-Frame-Options", "DENY")
