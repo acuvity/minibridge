@@ -28,6 +28,9 @@ var Scan = &cobra.Command{
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		ctx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
+
 		var mcpServer client.MCPServer
 		if args[0] == "check" {
 			mcpServer = client.MCPServer{Command: args[2], Args: args[3:]}
@@ -37,15 +40,12 @@ var Scan = &cobra.Command{
 
 		client := client.NewStdio(mcpServer)
 
-		ctx, cancel := context.WithCancel(cmd.Context())
-		defer cancel()
-
 		stream, err := client.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to start MCP server: %w", err)
 		}
 
-		dump, err := utils.DumpAll(cmd.Context(), stream)
+		dump, err := utils.DumpAll(ctx, stream)
 		if err != nil {
 			return fmt.Errorf("unable to dump tools: %w", err)
 		}

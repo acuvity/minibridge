@@ -54,8 +54,6 @@ var AIO = &cobra.Command{
 		ctx, cancel := context.WithCancel(cmd.Context())
 		defer cancel()
 
-		cmd.SetContext(ctx)
-
 		listen := viper.GetString("listen")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")

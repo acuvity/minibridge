@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -63,33 +64,41 @@ func NewSSE(addr string, backend string, serverTLSConfig *tls.Config, clientTLSC
 // until the server returns an error.
 func (p *sseFrontend) Start(ctx context.Context) error {
 
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
+
+	sctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	p.server.BaseContext = func(net.Listener) context.Context { return sctx }
+	p.server.RegisterOnShutdown(func() { cancel() })
 
 	go func() {
 		if p.server.TLSConfig == nil {
-			if err := p.server.ListenAndServe(); err != nil {
+			err := p.server.ListenAndServe()
+			if err != nil {
 				if !errors.Is(err, http.ErrServerClosed) {
 					slog.Error("unable to start server", "err", err)
 				}
-				errCh <- err
 			}
+			errCh <- err
 		} else {
-			if err := p.server.ListenAndServeTLS("", ""); err != nil {
+			err := p.server.ListenAndServeTLS("", "")
+			if err != nil {
 				if !errors.Is(err, http.ErrServerClosed) {
 					slog.Error("unable to start tls server", "err", err)
 				}
-				errCh <- err
 			}
+			errCh <- err
 		}
 	}()
 
 	select {
-	case <-ctx.Done():
+	case <-sctx.Done():
 	case err := <-errCh:
 		return err
 	}
 
-	stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	return p.server.Shutdown(stopCtx)

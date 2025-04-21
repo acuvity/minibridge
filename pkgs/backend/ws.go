@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -61,33 +62,41 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServ
 // context is canceled.
 func (p *wsBackend) Start(ctx context.Context) error {
 
-	errCh := make(chan error)
+	errCh := make(chan error, 1)
+
+	sctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	p.server.BaseContext = func(net.Listener) context.Context { return sctx }
+	p.server.RegisterOnShutdown(func() { cancel() })
 
 	go func() {
 		if p.server.TLSConfig == nil {
-			if err := p.server.ListenAndServe(); err != nil {
+			err := p.server.ListenAndServe()
+			if err != nil {
 				if !errors.Is(err, http.ErrServerClosed) {
 					slog.Error("unable to start server", "err", err)
 				}
-				errCh <- err
 			}
+			errCh <- err
 		} else {
-			if err := p.server.ListenAndServeTLS("", ""); err != nil {
+			err := p.server.ListenAndServeTLS("", "")
+			if err != nil {
 				if !errors.Is(err, http.ErrServerClosed) {
 					slog.Error("unable to start tls server", "err", err)
 				}
-				errCh <- err
 			}
+			errCh <- err
 		}
 	}()
 
 	select {
-	case <-ctx.Done():
+	case <-sctx.Done():
 	case err := <-errCh:
 		return err
 	}
 
-	stopctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	stopctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	return p.server.Shutdown(stopctx)
@@ -104,7 +113,10 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	stream, err := client.NewStdio(p.mcpServer).Start(req.Context())
+	ctx, cancel := context.WithCancel(req.Context())
+	defer cancel()
+
+	stream, err := client.NewStdio(p.mcpServer).Start(ctx)
 	if err != nil {
 		slog.Error("Unable to start mcp client", err)
 		http.Error(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError)
@@ -131,7 +143,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	session, err := wsc.Accept(req.Context(), ws, wsc.Config{WriteChanSize: 64, ReadChanSize: 16})
+	session, err := wsc.Accept(ctx, ws, wsc.Config{WriteChanSize: 64, ReadChanSize: 16})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to accept websocket: %s", err), http.StatusBadRequest)
 		return
@@ -155,7 +167,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from websocket", "msg", string(data))
 
-			data, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, data)
+			data, err = policeData(ctx, p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, data)
 			if err != nil {
 				if errors.Is(err, api.ErrBlocked) {
 					session.Write(sanitizeData(data))
@@ -171,7 +183,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from MCP Server", "msg", string(data))
 
-			data, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeOutput, agent, data)
+			data, err = policeData(ctx, p.cfg.policer, p.cfg.sbom, api.CallTypeOutput, agent, data)
 			if err != nil {
 				if errors.Is(err, api.ErrBlocked) {
 					session.Write(sanitizeData(data))
@@ -207,7 +219,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			slog.Debug("Websocket has closed")
 			return
 
-		case <-req.Context().Done():
+		case <-ctx.Done():
 			slog.Debug("Client is gone")
 			return
 		}

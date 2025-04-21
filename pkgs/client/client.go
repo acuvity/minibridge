@@ -23,46 +23,44 @@ func NewStdio(srv MCPServer) Client {
 
 func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {
 
-	subctx, cancel := context.WithCancel(ctx)
-
-	cmd := exec.CommandContext(subctx, c.srv.Command, c.srv.Args...) // #nosec: G204
+	cmd := exec.CommandContext(ctx, c.srv.Command, c.srv.Args...) // #nosec: G204
 	cmd.Env = append(os.Environ(), c.srv.Env...)
+	cmd.Cancel = func() error {
+		return cmd.Process.Signal(os.Interrupt)
+	}
+
+	setCaps(cmd, "") // TODO: add a chroot system
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		cancel()
 		return nil, fmt.Errorf("unable to create stdin pipe: %w", err)
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		cancel()
 		return nil, fmt.Errorf("unable to create stdout pipe: %w", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		cancel()
 		return nil, fmt.Errorf("unable to create stderr pipe: %w", err)
 	}
 
-	inCh := make(chan []byte, 1024)
-	go c.readRequests(subctx, stdin, inCh)
+	inCh := make(chan []byte)
+	go c.readRequests(ctx, stdin, inCh)
 
-	outCh := make(chan []byte, 1024)
-	go c.readResponses(subctx, stdout, outCh)
+	outCh := make(chan []byte)
+	go c.readResponses(ctx, stdout, outCh)
 
-	errCh := make(chan []byte, 1024)
-	go c.readErrors(subctx, stderr, errCh)
+	errCh := make(chan []byte)
+	go c.readErrors(ctx, stderr, errCh)
 
 	if err := cmd.Start(); err != nil {
-		cancel()
 		return nil, fmt.Errorf("unable to start command: %w", err)
 	}
 
 	exitCh := make(chan error)
 	go func() {
-		defer cancel()
 		exitCh <- cmd.Wait()
 	}()
 
@@ -79,13 +77,10 @@ func (c *stdioClient) readRequests(ctx context.Context, stdin io.WriteCloser, ch
 	for {
 		select {
 		case <-ctx.Done():
-			_ = stdin.Close()
 			return
 		case data := <-ch:
 			if _, err := stdin.Write(data); err != nil {
-				if ctx.Err() == nil {
-					slog.Error("Unable to write data to stdin", "err", err)
-				}
+				slog.Error("Unable to write data to stdin", "err", err)
 				return
 			}
 		}
@@ -98,10 +93,9 @@ func (c *stdioClient) readResponses(ctx context.Context, stdout io.ReadCloser, c
 	for {
 		data, err := bstdout.ReadBytes('\n')
 		if err != nil {
-			if ctx.Err() != nil || err == io.EOF {
-				return
+			if err != io.EOF {
+				slog.Error("Unable to read response from stdout", "err", err)
 			}
-			slog.Error("Unable to read response from stdout", "err", err)
 			return
 		}
 		select {
@@ -118,10 +112,9 @@ func (c *stdioClient) readErrors(ctx context.Context, stderr io.ReadCloser, ch c
 	for {
 		line, err := bstderr.ReadBytes('\n')
 		if err != nil {
-			if ctx.Err() != nil || err == io.EOF {
-				return
+			if err != io.EOF {
+				slog.Error("Unable to read error response from stderr", "err", err)
 			}
-			slog.Error("Unable to read error response from stderr", "err", err)
 			return
 		}
 		select {
