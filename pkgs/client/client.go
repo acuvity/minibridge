@@ -25,13 +25,24 @@ func NewStdio(srv MCPServer) Client {
 
 func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {
 
+	dir, err := os.MkdirTemp(os.TempDir(), "minibridge-")
+	if err != nil {
+		return nil, fmt.Errorf("unable to create tempdir: %w", err)
+	}
+
 	cmd := exec.CommandContext(ctx, c.srv.Command, c.srv.Args...) // #nosec: G204
 	cmd.Env = append(os.Environ(), c.srv.Env...)
+	cmd.Dir = dir
 	cmd.Cancel = func() error {
-		return cmd.Process.Signal(os.Interrupt)
+		if err := cmd.Process.Signal(os.Interrupt); err != nil {
+			return err
+		}
+		return os.RemoveAll(dir)
 	}
 
 	setCaps(cmd, "") // TODO: add a chroot system
+
+	slog.Debug("Client: starting command", "path", cmd.Path, "dir", cmd.Dir)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
