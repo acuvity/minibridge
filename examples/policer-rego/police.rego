@@ -2,6 +2,8 @@ package main
 
 import rego.v1
 
+default allow = false
+
 claims := x if {
 	[verified, _, x] := io.jwt.decode_verify(
 		input.agent.token,
@@ -14,12 +16,12 @@ claims := x if {
 	verified == true
 }
 
-deny contains msg if {
+reasons contains msg if {
 	not claims
 	msg := "You must provide a valid token"
 }
 
-deny contains msg if {
+reasons contains msg if {
 	input.mcp.method == "tools/call"
 	input.mcp.params.name == "printEnv"
 	claims.email != "alice@example.com"
@@ -34,4 +36,8 @@ mcp := x if {
 		"path": "/result/tools",
 		"value": [x | x := input.mcp.result.tools[_]; x.name != "longRunningOperation"],
 	}])
+}
+
+allow if {
+	count(reasons) == 0
 }

@@ -333,20 +333,22 @@ The policer must return a response with the following information:
 
 ```json
 {
-  "deny": ["reason 1", "reason 2"],
+  "allow": true,
+  "reasons": ["reason 1", "reason 2"],
   "mcp": null,
 }
 ```
 
-If `deny` is set an not empty, then the request or response is considered as
-blocked and Minibridge will not forward it to the MCP server or to the Agent.
-Instead, it will return a descriptive MCP error containing the deny reasons, to
-the caller.
+If `allow` is `true`, the request or response is allowed and will be forwarded.
 
-If `deny` is `null` or empty, the call is allowed and will be forwarded.
+If `allowed` is `false`, then the request or response is considered as blocked
+and Minibridge will not forward it to the MCP server or to the Agent. Instead,
+it will return a descriptive MCP error containing the `reasons` (if any), to the
+caller. If no `reasons` are set (empty or null), a generic reason will be
+used.
 
-In addition, if the call is allowed, and `mcp` is non null, Minibridge will swap
-the original MCP call with the one provider in the response, allowing Policers
+In addition, if `allow` is `true`, and `mcp` is non null, Minibridge will swap
+the original MCP call with the one provided in the response, allowing Policers
 to mutate the call. For instance this can be used to hide some tools based on
 the agent identity.
 
@@ -360,24 +362,15 @@ by `--provider-http-url`.
 To allow the request or response, the HTTP Policer must respond with:
 
 - An HTTP status `204 No Content`, or
-- An HTTP status `200 OK` with `deny` property set to `null` or `[]`
+- An HTTP status `200 OK` with `allow` property set `true`.
 
 To disallow the request or response:
 
-- An HTTP status `200 OK` in case of deny with a valid response.
+- An HTTP status `200 OK` with `allow` set to `false` and optional `reasons`.
 - Any other HTTP code will also deny the request, but is considered as an error.
 
 
-For example, a policy result that denies the request:
-
-```http
-HTTP/1.1 200 OK
-
-
-{ "deny": ["You are not allowed to list the tools"] }
-```
-
-And a policy result that permits the request:
+For example, a policy result that allows the request:
 
 ```http
 HTTP/1.1 204 No Content
@@ -389,8 +382,18 @@ Or
 HTTP/1.1 200 OK
 
 
-{ "deny": [] }
+{ "allow": true }
 ```
+
+And a policy result that denies the request:
+
+```http
+HTTP/1.1 200 OK
+
+
+{ "allow": false, "reasons": ["You are not allowed to list the tools"] }
+```
+
 
 The HTTP Policer can also decide to mutate the MCP call. To do so, it must allow
 the request, and pass back a modified MCP call:
@@ -400,6 +403,7 @@ HTTP/1.1 200 OK
 
 
 {
+  "allow": true,
   "mcp": {
     "id": 2,
     "jsonrpc": "2.0",
@@ -427,7 +431,7 @@ For instance, to allow the request:
 package main
 import rego.v1
 
-allow := true
+allow = true
 ```
 
 To deny the request:
@@ -436,12 +440,18 @@ To deny the request:
 package main
 import rego.v1
 
-deny contains msg if {
+default allow := false
+
+allow if {
+  count(reasons) == 0
+}
+
+reasons contains msg if {
   input.agent.token == ""
   msg := "you must send a token"
 }
 
-deny contains msg if {
+reasons contains msg if {
   input.mcp.method == "tools/call"
   input.mcp.params.name == "printEnv"
   msg := "you cannot use printEnv"

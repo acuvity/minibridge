@@ -46,7 +46,7 @@ def police():
         )
     except Exception as e:
         print(c(f"DENIED: invalid token: {e}", "red"))
-        return json.dumps({"deny": [f"{e}"]})
+        return json.dumps({"allow": False, "reasons": [f"{e}"]})
 
     # This is an example of blanket policing. We deny access
     # to the tool/calls declared in FORBIDDEN_TOOLS
@@ -61,7 +61,7 @@ def police():
         ):
             dmsg = f"forbidden method call {mcp['params']['name']} {mcp['method']}"
             print(c(f"DENIED: {dmsg}", "red"))
-            return json.dumps({"deny": [dmsg]})
+            return json.dumps({"allow": False, "reasons": [dmsg]})
 
     # This is an example of redaction: If the
     # user is Bob, then we remove the tool named `longRunningOperation`.
@@ -78,7 +78,9 @@ def police():
                 for cell in result["tools"]
                 if cell["name"] != "longRunningOperation"
             ]
-            return Response(status=200, response=json.dumps({"mcp": mcp}))
+            return Response(
+                status=200, response=json.dumps({"allow": True, "mcp": mcp})
+            )
 
     # otherwise we allow everything
     return Response(status=204)
