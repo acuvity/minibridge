@@ -23,7 +23,7 @@ import (
 	"go.acuvity.ai/minibridge/pkgs/data"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
-	"go.acuvity.ai/minibridge/pkgs/utils"
+	"go.acuvity.ai/minibridge/pkgs/scan"
 	"go.acuvity.ai/wsc"
 )
 
@@ -251,7 +251,7 @@ func parseBasicAuth(auth string) (password string, ok bool) {
 	return password, true
 }
 
-func policeData(ctx context.Context, pol policer.Policer, hashes utils.SBOM, typ api.CallType, agent api.Agent, data []byte) ([]byte, error) {
+func policeData(ctx context.Context, pol policer.Policer, hashes scan.SBOM, typ api.CallType, agent api.Agent, data []byte) ([]byte, error) {
 
 	call := api.MCPCall{}
 	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
@@ -266,7 +266,7 @@ func policeData(ctx context.Context, pol policer.Policer, hashes utils.SBOM, typ
 			return nil, fmt.Errorf("unable to decode tools result for hashing: %w", err)
 		}
 
-		lhashes, err := utils.HashTools(tools)
+		lhashes, err := scan.HashTools(tools)
 		if err != nil {
 			return nil, fmt.Errorf("unable to hash tools result: %w", err)
 		}
@@ -284,7 +284,7 @@ func policeData(ctx context.Context, pol policer.Policer, hashes utils.SBOM, typ
 			return nil, fmt.Errorf("unable to decode prompts result for hashing: %w", err)
 		}
 
-		lhashes, err := utils.HashPrompts(prompts)
+		lhashes, err := scan.HashPrompts(prompts)
 		if err != nil {
 			return nil, fmt.Errorf("unable to hash prompts result: %w", err)
 		}

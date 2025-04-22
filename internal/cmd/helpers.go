@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/policer"
-	"go.acuvity.ai/minibridge/pkgs/utils"
+	"go.acuvity.ai/minibridge/pkgs/scan"
 	"go.acuvity.ai/tg/tglib"
 )
 
@@ -228,15 +228,15 @@ func mtlsMode(tlsCfg *tls.Config) string {
 	return tlsCfg.ClientAuth.String()
 }
 
-func makeSBOM() (utils.SBOM, error) {
+func makeSBOM() (scan.SBOM, error) {
 
 	sbomFile := viper.GetString("sbom")
 
 	if sbomFile == "" {
-		return utils.SBOM{}, nil
+		return scan.SBOM{}, nil
 	}
 
-	sbom, err := utils.LoadSBOM(sbomFile)
+	sbom, err := scan.LoadSBOM(sbomFile)
 	if err != nil {
 		return sbom, fmt.Errorf("unable load sbom file: %w", err)
 	}

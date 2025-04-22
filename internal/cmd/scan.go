@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"go.acuvity.ai/minibridge/pkgs/client"
-	"go.acuvity.ai/minibridge/pkgs/utils"
+	"go.acuvity.ai/minibridge/pkgs/scan"
 )
 
 func init() {
@@ -45,24 +45,24 @@ var Scan = &cobra.Command{
 			return fmt.Errorf("unable to start MCP server: %w", err)
 		}
 
-		dump, err := utils.DumpAll(ctx, stream)
+		dump, err := scan.DumpAll(ctx, stream)
 		if err != nil {
 			return fmt.Errorf("unable to dump tools: %w", err)
 		}
 
 		cancel()
 
-		toolHashes, err := utils.HashTools(dump.Tools)
+		toolHashes, err := scan.HashTools(dump.Tools)
 		if err != nil {
 			return fmt.Errorf("unable to hash tools: %w", err)
 		}
 
-		promptHashes, err := utils.HashPrompts(dump.Prompts)
+		promptHashes, err := scan.HashPrompts(dump.Prompts)
 		if err != nil {
 			return fmt.Errorf("unable to hash prompts: %w", err)
 		}
 
-		sbom := utils.SBOM{
+		sbom := scan.SBOM{
 			Tools:   toolHashes,
 			Prompts: promptHashes,
 		}
@@ -71,7 +71,7 @@ var Scan = &cobra.Command{
 
 		case "check":
 
-			refSBOM, err := utils.LoadSBOM(args[1])
+			refSBOM, err := scan.LoadSBOM(args[1])
 			if err != nil {
 				return fmt.Errorf("unable to load sbom: %w", err)
 			}

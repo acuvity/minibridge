@@ -1,4 +1,4 @@
-package utils
+package scan
 
 import (
 	"fmt"
