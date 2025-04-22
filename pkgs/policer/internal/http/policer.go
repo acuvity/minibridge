@@ -54,15 +54,15 @@ func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, e
 		return nil, fmt.Errorf("unable to send request: %w", err)
 	}
 
+	if resp.StatusCode == http.StatusNoContent {
+		return nil, nil
+	}
+
 	rbody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read response body: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNoContent {
-		return nil, nil
-	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("invalid response from policer `%s`: %s", string(rbody), resp.Status)
@@ -73,9 +73,13 @@ func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, e
 		return nil, fmt.Errorf("unable to decode response body: %w", err)
 	}
 
-	if len(sresp.Deny) == 0 {
+	if sresp.Allow {
 		return sresp.MCP, nil
 	}
 
-	return nil, fmt.Errorf("%w: %s", api.ErrBlocked, strings.Join(sresp.Deny, ", "))
+	if len(sresp.Reasons) == 0 {
+		sresp.Reasons = []string{api.GenericDenyReason}
+	}
+
+	return nil, fmt.Errorf("%w: %s", api.ErrBlocked, strings.Join(sresp.Reasons, ", "))
 }

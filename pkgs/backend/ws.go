@@ -179,7 +179,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from MCP Server", "msg", string(buf))
 
-			if buf, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeOutput, agent, buf); err != nil {
+			if buf, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeResponse, agent, buf); err != nil {
 				if errors.Is(err, api.ErrBlocked) {
 					session.Write(data.Sanitize(buf))
 					continue

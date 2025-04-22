@@ -12,8 +12,9 @@ import (
 )
 
 type Policer struct {
-	queryDeny rego.PreparedEvalQuery
-	queryMCP  rego.PreparedEvalQuery
+	queryAllow   rego.PreparedEvalQuery
+	queryReasons rego.PreparedEvalQuery
+	queryMCP     rego.PreparedEvalQuery
 }
 
 // New returns a new Rego based Policer.
@@ -27,7 +28,12 @@ func New(policy string) (*Policer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	queryDeny, err := rego.New(rego.Compiler(comp), rego.Query("deny := data.main.deny")).PrepareForEval(ctx)
+	queryAllow, err := rego.New(rego.Compiler(comp), rego.Query("data.main.allow")).PrepareForEval(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to prepare rego deny query: %w", err)
+	}
+
+	queryReasons, err := rego.New(rego.Compiler(comp), rego.Query("reasons := data.main.reasons")).PrepareForEval(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to prepare rego deny query: %w", err)
 	}
@@ -38,34 +44,38 @@ func New(policy string) (*Policer, error) {
 	}
 
 	return &Policer{
-		queryDeny: queryDeny,
-		queryMCP:  queryMCP,
+		queryAllow:   queryAllow,
+		queryReasons: queryReasons,
+		queryMCP:     queryMCP,
 	}, nil
 }
 
 func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, error) {
 
-	res, err := p.queryDeny.Eval(ctx, rego.EvalInput(preq), rego.EvalPrintHook(printer{}))
+	res, err := p.queryAllow.Eval(ctx, rego.EvalInput(preq), rego.EvalPrintHook(printer{}))
 	if err != nil {
-		return nil, fmt.Errorf("unable to eval deny query: %w", err)
+		return nil, fmt.Errorf("unable to eval allow query: %w", err)
 	}
 
-	if len(res) == 0 || res.Allowed() {
-		return nil, nil
-	}
+	if !res.Allowed() {
 
-	bindings := res[0].Bindings
+		res, err = p.queryReasons.Eval(ctx, rego.EvalInput(preq), rego.EvalPrintHook(printer{}))
+		if err != nil {
+			return nil, fmt.Errorf("unable to eval reasons query: %w", err)
+		}
 
-	denies, ok := bindings["deny"].([]any)
-	if !ok {
-		return nil, fmt.Errorf("invalid binding: deny must be an array, got %T", bindings["reasons"])
-	}
+		reasons := []string{api.GenericDenyReason}
 
-	if len(denies) > 0 {
+		if len(res) > 0 {
+			bindings := res[0].Bindings
+			breasons, _ := bindings["reasons"].([]any)
 
-		reasons := make([]string, len(denies))
-		for i, v := range denies {
-			reasons[i], _ = v.(string)
+			if len(breasons) > 0 {
+				reasons = make([]string, len(breasons))
+				for i, v := range breasons {
+					reasons[i], _ = v.(string)
+				}
+			}
 		}
 
 		return nil, fmt.Errorf("%w: %s", api.ErrBlocked, strings.Join(reasons, ", "))
@@ -80,7 +90,7 @@ func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, e
 		return nil, nil
 	}
 
-	bindings = res[0].Bindings
+	bindings := res[0].Bindings
 
 	mcp, ok := bindings["mcp"].(map[string]any)
 	if !ok {

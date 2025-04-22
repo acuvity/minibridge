@@ -5,8 +5,8 @@ type CallType string
 
 // Various values of RequestType
 var (
-	CallTypeRequest CallType = "request"
-	CallTypeOutput  CallType = "response"
+	CallTypeRequest  CallType = "request"
+	CallTypeResponse CallType = "response"
 )
 
 // A Request represents the data sent to the Policer
