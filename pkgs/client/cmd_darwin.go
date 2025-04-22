@@ -1,4 +1,4 @@
-//go:build !darwin && !linux
+//go:build darwin
 
 package client
 
@@ -8,5 +8,7 @@ import (
 )
 
 func setCaps(cmd *exec.Cmd, chroot string) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Chroot: chroot,
+	}
 }
