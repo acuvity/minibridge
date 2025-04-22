@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 
 	"go.acuvity.ai/minibridge/pkgs/data"
 )
@@ -32,6 +33,9 @@ func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {
 
 	cmd := exec.CommandContext(ctx, c.srv.Command, c.srv.Args...) // #nosec: G204
 	cmd.Env = append(os.Environ(), c.srv.Env...)
+	for i, e := range cmd.Env {
+		cmd.Env[i] = strings.ReplaceAll(e, "_MINIBRIDGE_PREFIX_", dir)
+	}
 	cmd.Dir = dir
 	cmd.Cancel = func() error {
 		if err := cmd.Process.Signal(os.Interrupt); err != nil {
@@ -40,9 +44,9 @@ func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {
 		return os.RemoveAll(dir)
 	}
 
-	setCaps(cmd, "") // TODO: add a chroot system
+	setCaps(cmd, "")
 
-	slog.Debug("Client: starting command", "path", cmd.Path, "dir", cmd.Dir)
+	slog.Debug("Client: starting command", "path", cmd.Path, "dir", cmd.Dir, "env", cmd.Env)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
