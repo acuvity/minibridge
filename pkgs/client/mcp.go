@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"os/exec"
 
 	"go.acuvity.ai/elemental"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
@@ -14,6 +15,19 @@ type MCPServer struct {
 	Command string
 	Args    []string
 	Env     []string
+}
+
+// NewMCPServer returtns a new MCPServer. Returns an error is the given cmd path
+// does not exist.
+func NewMCPServer(path string, args ...string) (MCPServer, error) {
+	p, err := exec.LookPath(path)
+	if err != nil {
+		return MCPServer{}, fmt.Errorf("unable to create mcp server: %w", err)
+	}
+	return MCPServer{
+		Command: p,
+		Args:    args,
+	}, nil
 }
 
 // MCPStream holds MCPServer command standard streams as channels.

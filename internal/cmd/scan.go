@@ -33,10 +33,14 @@ var Scan = &cobra.Command{
 		defer cancel()
 
 		var mcpServer client.MCPServer
+		var err error
 		if args[0] == "check" {
-			mcpServer = client.MCPServer{Command: args[2], Args: args[3:]}
+			mcpServer, err = client.NewMCPServer(args[2], args[3:]...)
 		} else {
-			mcpServer = client.MCPServer{Command: args[1], Args: args[2:]}
+			mcpServer, err = client.NewMCPServer(args[1], args[2:]...)
+		}
+		if err != nil {
+			return err
 		}
 
 		client := client.NewStdio(mcpServer)

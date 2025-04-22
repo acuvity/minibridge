@@ -109,7 +109,11 @@ var AIO = &cobra.Command{
 
 			defer cancel()
 
-			mcpServer := client.MCPServer{Command: args[0], Args: args[1:]}
+			mcpServer, err := client.NewMCPServer(args[0], args[1:]...)
+			if err != nil {
+				return err
+			}
+
 			slog.Info("MCP server configured",
 				"command", mcpServer.Command,
 				"args", mcpServer.Args,
