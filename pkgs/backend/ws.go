@@ -96,10 +96,10 @@ func (p *wsBackend) Start(ctx context.Context) error {
 		return err
 	}
 
-	stopctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stopCancel()
 
-	return p.server.Shutdown(stopctx)
+	return p.server.Shutdown(stopCtx)
 }
 
 func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -113,10 +113,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithCancel(req.Context())
-	defer cancel()
-
-	stream, err := client.NewStdio(p.mcpServer, p.cfg.clientOpts...).Start(ctx)
+	stream, err := client.NewStdio(p.mcpServer, p.cfg.clientOpts...).Start(req.Context())
 	if err != nil {
 		slog.Error("Unable to start mcp client", err)
 		http.Error(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError)
@@ -143,7 +140,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	session, err := wsc.Accept(ctx, ws, wsc.Config{WriteChanSize: 64, ReadChanSize: 16})
+	session, err := wsc.Accept(req.Context(), ws, wsc.Config{WriteChanSize: 64, ReadChanSize: 16})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to accept websocket: %s", err), http.StatusBadRequest)
 		return
@@ -167,7 +164,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from websocket", "msg", string(buf))
 
-			if buf, err = policeData(ctx, p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, buf); err != nil {
+			if buf, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, buf); err != nil {
 				if errors.Is(err, api.ErrBlocked) {
 					session.Write(data.Sanitize(buf))
 					continue
@@ -182,7 +179,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from MCP Server", "msg", string(buf))
 
-			if buf, err = policeData(ctx, p.cfg.policer, p.cfg.sbom, api.CallTypeOutput, agent, buf); err != nil {
+			if buf, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeOutput, agent, buf); err != nil {
 				if errors.Is(err, api.ErrBlocked) {
 					session.Write(data.Sanitize(buf))
 					continue
@@ -217,7 +214,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			slog.Debug("Websocket has closed")
 			return
 
-		case <-ctx.Done():
+		case <-req.Context().Done():
 			slog.Debug("Client is gone")
 			return
 		}

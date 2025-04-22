@@ -99,8 +99,8 @@ func (p *sseFrontend) Start(ctx context.Context) error {
 		return err
 	}
 
-	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), time.Second)
+	defer stopCancel()
 
 	return p.server.Shutdown(stopCtx)
 }
@@ -186,7 +186,7 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 		select {
 
 		case <-req.Context().Done():
-			log.Debug("Client is gone")
+			log.Debug("Client is gone from /sse")
 			return
 
 		case buf := <-ws.Read():
@@ -279,6 +279,9 @@ func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	case p.cfg.messagesEndpoint:
 		p.handleMessages(w, req)
+
+	default:
+		http.Error(w, "Not Found", http.StatusNotFound)
 	}
 }
 

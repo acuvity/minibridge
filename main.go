@@ -41,7 +41,7 @@ func main() {
 
 func installSIGINTHandler(cancel context.CancelFunc) {
 
-	sigs := []os.Signal{syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGCHLD, syscall.SIGABRT}
+	sigs := []os.Signal{syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGABRT}
 	signalCh := make(chan os.Signal, 1)
 	signal.Reset(sigs...)
 	signal.Notify(signalCh, sigs...)
