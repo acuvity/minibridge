@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"go.acuvity.ai/minibridge/pkgs/client"
@@ -158,8 +160,16 @@ func HashTools(tools api.Tools) (Hashes, error) {
 			}
 		}
 
+		slices.SortFunc(h.Params, func(a Hash, b Hash) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+
 		hashes = append(hashes, h)
 	}
+
+	slices.SortFunc(hashes, func(a Hash, b Hash) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	return hashes, nil
 }
@@ -183,8 +193,16 @@ func HashPrompts(prompts api.Prompts) (Hashes, error) {
 			})
 		}
 
+		slices.SortFunc(h.Params, func(a Hash, b Hash) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+
 		hashes = append(hashes, h)
 	}
+
+	slices.SortFunc(hashes, func(a Hash, b Hash) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	return hashes, nil
 }

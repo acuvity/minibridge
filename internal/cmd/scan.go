@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"go.acuvity.ai/minibridge/pkgs/client"
@@ -86,13 +87,19 @@ var Scan = &cobra.Command{
 
 		case "sbom":
 
-			d, _ := json.MarshalIndent(sbom, "", "  ")
-			fmt.Println(string(d))
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			if err := enc.Encode(sbom); err != nil {
+				return fmt.Errorf("unable to encode sbom: %w", err)
+			}
 
 		case "dump":
 
-			d, _ := json.MarshalIndent(dump, "", "  ")
-			fmt.Println(string(d))
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			if err := enc.Encode(dump); err != nil {
+				return fmt.Errorf("unable to encode dump: %w", err)
+			}
 
 		default:
 			return fmt.Errorf("first command must be either dump, sbom or check")
