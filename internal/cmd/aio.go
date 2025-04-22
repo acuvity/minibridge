@@ -39,6 +39,7 @@ func init() {
 	AIO.Flags().AddFlagSet(fCORS)
 	AIO.Flags().AddFlagSet(fAgentAuth)
 	AIO.Flags().AddFlagSet(fSBOM)
+	AIO.Flags().AddFlagSet(fMCP)
 }
 
 var AIO = &cobra.Command{
@@ -94,6 +95,8 @@ var AIO = &cobra.Command{
 
 		corsPolicy := makeCORSPolicy()
 
+		clientOpts := makeMCPClientOptions()
+
 		startHelperServers(ctx)
 
 		iport, err := randomFreePort()
@@ -125,6 +128,7 @@ var AIO = &cobra.Command{
 				backend.OptWSPolicer(policer),
 				backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
 				backend.OptSBOM(sbom),
+				backend.OptClientOptions(clientOpts...),
 			)
 
 			return proxy.Start(ctx)

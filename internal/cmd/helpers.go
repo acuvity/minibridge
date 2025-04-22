@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.acuvity.ai/bahamut"
+	"go.acuvity.ai/minibridge/pkgs/client"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/scan"
 	"go.acuvity.ai/tg/tglib"
@@ -247,4 +248,31 @@ func makeSBOM() (scan.SBOM, error) {
 	)
 
 	return sbom, nil
+}
+
+func makeMCPClientOptions() []client.Option {
+
+	uid := viper.GetInt("mcp-uid")
+	gid := viper.GetInt("mcp-gid")
+	groups := viper.GetIntSlice("mcp-groups")
+	tmp := viper.GetBool("mcp-use-tempdir")
+
+	opts := []client.Option{
+		client.OptUseTempDir(tmp),
+	}
+
+	if uid > -1 && gid > -1 || len(groups) > 0 {
+		opts = append(opts, client.OptCredentials(uid, gid, groups))
+	}
+
+	if uid > -1 || gid > -1 || len(groups) > 0 || tmp {
+		slog.Info("MCP server isolation",
+			"use-temp", tmp,
+			"uid", uid,
+			"gid", gid,
+			"groups", groups,
+		)
+	}
+
+	return opts
 }

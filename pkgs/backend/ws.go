@@ -116,7 +116,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithCancel(req.Context())
 	defer cancel()
 
-	stream, err := client.NewStdio(p.mcpServer).Start(ctx)
+	stream, err := client.NewStdio(p.mcpServer, p.cfg.clientOpts...).Start(ctx)
 	if err != nil {
 		slog.Error("Unable to start mcp client", err)
 		http.Error(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError)

@@ -26,6 +26,7 @@ func init() {
 	Backend.Flags().AddFlagSet(fProfiler)
 	Backend.Flags().AddFlagSet(fCORS)
 	Backend.Flags().AddFlagSet(fSBOM)
+	Backend.Flags().AddFlagSet(fMCP)
 }
 
 // Backend is the cobra command to run the server.
@@ -62,6 +63,8 @@ var Backend = &cobra.Command{
 
 		corsPolicy := makeCORSPolicy()
 
+		clientOpts := makeMCPClientOptions()
+
 		startHelperServers(cmd.Context())
 
 		mcpServer, err := client.NewMCPServer(args[0], args[1:]...)
@@ -85,6 +88,7 @@ var Backend = &cobra.Command{
 			backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
 			backend.OptWSCORSPolicy(corsPolicy),
 			backend.OptSBOM(sbom),
+			backend.OptClientOptions(clientOpts...),
 		)
 
 		return proxy.Start(cmd.Context())

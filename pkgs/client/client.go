@@ -15,20 +15,35 @@ import (
 
 type stdioClient struct {
 	srv MCPServer
+	cfg cfg
 }
 
 // NewStdio returns a Client communicating through stdio.
-func NewStdio(srv MCPServer) Client {
+func NewStdio(srv MCPServer, options ...Option) Client {
+
+	cfg := newCfg()
+	for _, o := range options {
+		o(&cfg)
+	}
+
 	return &stdioClient{
 		srv: srv,
+		cfg: cfg,
 	}
 }
 
 func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {
 
-	dir, err := os.MkdirTemp(os.TempDir(), "minibridge-")
+	dir, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("unable to create tempdir: %w", err)
+		return nil, fmt.Errorf("unable to get current directory: %w", err)
+	}
+
+	if c.cfg.useTempDir {
+		dir, err = os.MkdirTemp(os.TempDir(), "minibridge-")
+		if err != nil {
+			return nil, fmt.Errorf("unable to create tempdir: %w", err)
+		}
 	}
 
 	cmd := exec.CommandContext(ctx, c.srv.Command, c.srv.Args...) // #nosec: G204
@@ -36,17 +51,27 @@ func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {
 	for i, e := range cmd.Env {
 		cmd.Env[i] = strings.ReplaceAll(e, "_MINIBRIDGE_PREFIX_", dir)
 	}
+
 	cmd.Dir = dir
 	cmd.Cancel = func() error {
 		if err := cmd.Process.Signal(os.Interrupt); err != nil {
 			return err
 		}
-		return os.RemoveAll(dir)
+
+		if c.cfg.useTempDir {
+			return os.RemoveAll(dir)
+		}
+
+		return nil
 	}
 
-	setCaps(cmd, "")
+	setCaps(cmd, "", c.cfg.creds)
 
-	slog.Debug("Client: starting command", "path", cmd.Path, "dir", cmd.Dir, "env", cmd.Env)
+	slog.Debug("Client: starting command",
+		"path", cmd.Path,
+		"dir", cmd.Dir,
+		"creds", c.cfg.creds,
+	)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
