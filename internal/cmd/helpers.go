@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/client"
+	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/scan"
 	"go.acuvity.ai/tg/tglib"
@@ -95,35 +96,25 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func startHelperServers(ctx context.Context) bahamut.MetricsManager { // nolint: unparam
+func startHealthServer(ctx context.Context) (manager *metrics.Manager) {
 
-	healthEnabled := viper.GetBool("health-enable")
 	healthListen := viper.GetString("health-listen")
-	profilingEnabled := viper.GetBool("profiling-enable")
-	profilingListen := viper.GetString("profiling-listen")
 
-	opts := []bahamut.Option{}
-	var metricsManager bahamut.MetricsManager
-
-	if healthEnabled && healthListen != "" {
-
-		metricsManager = bahamut.NewPrometheusMetricsManager()
-
-		opts = append(opts,
-			bahamut.OptHealthServer(healthListen, nil),
-			bahamut.OptHealthServerMetricsManager(metricsManager),
-		)
+	if healthListen == "" {
+		return nil
 	}
 
-	if profilingEnabled && profilingListen != "" {
-		opts = append(opts, bahamut.OptProfilingLocal(profilingListen))
-	}
+	manager = metrics.NewManager(healthListen)
 
-	if len(opts) > 0 {
-		go bahamut.New(opts...).Run(ctx)
-	}
+	go func() {
+		if err := manager.Start(ctx); err != nil {
+			slog.Error("unable to start metric managed: %w", err)
+		}
+	}()
 
-	return metricsManager
+	slog.Info("Metrics manager configured", "listen", healthListen, "health", "/", "metrics", "/metrics")
+
+	return manager
 }
 
 func makePolicer() (policer.Policer, error) {

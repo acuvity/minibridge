@@ -3,16 +3,18 @@ package backend
 import (
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/client"
+	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/scan"
 )
 
 type wsCfg struct {
-	policer    policer.Policer
-	dumpStderr bool
-	corsPolicy *bahamut.CORSPolicy
-	sbom       scan.SBOM
-	clientOpts []client.Option
+	policer        policer.Policer
+	dumpStderr     bool
+	corsPolicy     *bahamut.CORSPolicy
+	sbom           scan.SBOM
+	clientOpts     []client.Option
+	metricsManager *metrics.Manager
 }
 
 func newWSCfg() wsCfg {
@@ -57,5 +59,13 @@ func OptSBOM(sbom scan.SBOM) OptWS {
 func OptClientOptions(opts ...client.Option) OptWS {
 	return func(cfg *wsCfg) {
 		cfg.clientOpts = opts
+	}
+}
+
+// OptMetricsManager sets the metric manager to use to collect
+// prometheus metrics.
+func OptMetricsManager(m *metrics.Manager) OptWS {
+	return func(cfg *wsCfg) {
+		cfg.metricsManager = m
 	}
 }

@@ -73,6 +73,17 @@ func (p *sseFrontend) Start(ctx context.Context) error {
 	p.server.BaseContext = func(net.Listener) context.Context { return sctx }
 	p.server.RegisterOnShutdown(func() { cancel() })
 
+	if mm := p.cfg.metricsManager; mm != nil {
+		p.server.ConnState = func(conn net.Conn, state http.ConnState) {
+			switch state {
+			case http.StateNew:
+				mm.RegisterTCPConnection()
+			case http.StateClosed, http.StateHijacked:
+				mm.UnregisterTCPConnection()
+			}
+		}
+	}
+
 	go func() {
 		if p.server.TLSConfig == nil {
 			err := p.server.ListenAndServe()
@@ -131,8 +142,14 @@ func (p *sseFrontend) getSession(sid string) session {
 
 func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
+	m := func(int) time.Duration { return 0 }
+	if mm := p.cfg.metricsManager; mm != nil {
+		m = mm.MeasureRequest(req.Method, req.URL.Path)
+	}
+
 	if req.Method != http.MethodGet {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		m(http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -151,6 +168,7 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 	})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Unable to connect to minibridge end: %s", err), http.StatusInternalServerError)
+		m(http.StatusInternalServerError)
 		return
 	}
 
@@ -171,15 +189,20 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, sid); err != nil {
 		log.Error("Unable to send endpoint event", err)
+		m(http.StatusInternalServerError)
 		return
 	}
 
 	if err := rc.Flush(); err != nil {
 		log.Error("Unable to flush endpoint event", err)
+		m(http.StatusInternalServerError)
 		return
 	}
 
-	defer func() { _ = rc.Flush() }()
+	defer func() {
+		_ = rc.Flush()
+		m(http.StatusOK)
+	}()
 
 	for {
 
@@ -216,14 +239,21 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 
+	m := func(int) time.Duration { return 0 }
+	if p.cfg.metricsManager != nil {
+		m = p.cfg.metricsManager.MeasureRequest(req.Method, req.URL.Path)
+	}
+
 	if req.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		m(http.StatusMethodNotAllowed)
 		return
 	}
 
 	sid := req.URL.Query().Get("sessionId")
 	if sid == "" {
 		http.Error(w, "Query parameter ID is required", http.StatusBadRequest)
+		m(http.StatusBadRequest)
 		return
 	}
 
@@ -235,6 +265,7 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 	session := p.getSession(sid)
 	if session.ws == nil {
 		http.Error(w, "Session not found", http.StatusNotFound)
+		m(http.StatusNotFound)
 		return
 	}
 
@@ -242,12 +273,14 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 
 	if hashCreds(wsToken, wsAuthHeaders) != session.credHash {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		m(http.StatusUnauthorized)
 		return
 	}
 
 	buf, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to read body: %s", err), http.StatusBadRequest)
+		m(http.StatusBadRequest)
 		return
 	}
 	defer func() { _ = req.Body.Close() }()
@@ -260,6 +293,8 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Add("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusAccepted)
+
+	defer m(http.StatusAccepted)
 
 	session.ws.Write(data.Sanitize(buf))
 }

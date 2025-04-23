@@ -12,6 +12,7 @@ import (
 // A Policer is the interface of objects that can police request.
 type Policer interface {
 	Police(context.Context, api.Request) (*api.MCPCall, error)
+	Type() string
 }
 
 // NewRego returns a new rego based Policer.

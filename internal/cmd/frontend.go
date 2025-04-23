@@ -66,7 +66,7 @@ var Frontend = &cobra.Command{
 
 		corsPolicy := makeCORSPolicy()
 
-		startHelperServers(cmd.Context())
+		mm := startHealthServer(cmd.Context())
 
 		var proxy frontend.Frontend
 
@@ -94,6 +94,7 @@ var Frontend = &cobra.Command{
 				frontend.OptSSEAgentToken(agentToken),
 				frontend.OptSSEAgentTokenPassthrough(agentTokenPassthrough),
 				frontend.OptSSECORSPolicy(corsPolicy),
+				frontend.OptMetricsManager(mm),
 			)
 
 		} else {

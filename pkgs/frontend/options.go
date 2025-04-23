@@ -1,6 +1,9 @@
 package frontend
 
-import "go.acuvity.ai/bahamut"
+import (
+	"go.acuvity.ai/bahamut"
+	"go.acuvity.ai/minibridge/pkgs/metrics"
+)
 
 type sseCfg struct {
 	sseEndpoint           string
@@ -8,6 +11,7 @@ type sseCfg struct {
 	agentTokenPassthrough bool
 	agentToken            string
 	corsPolicy            *bahamut.CORSPolicy
+	metricsManager        *metrics.Manager
 }
 
 func newSSECfg() sseCfg {
@@ -60,6 +64,14 @@ func OptSSEAgentToken(tokenString string) OptSSE {
 func OptSSEAgentTokenPassthrough(passthrough bool) OptSSE {
 	return func(cfg *sseCfg) {
 		cfg.agentTokenPassthrough = passthrough
+	}
+}
+
+// OptMetricsManager sets the metric manager to use to collect
+// prometheus metrics.
+func OptMetricsManager(m *metrics.Manager) OptSSE {
+	return func(cfg *sseCfg) {
+		cfg.metricsManager = m
 	}
 }
 

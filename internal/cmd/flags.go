@@ -37,11 +37,7 @@ func initSharedFlagSet() {
 	fTLSClient.String("tls-client-backend-ca", "", "path to a CA to validate the minibridge backend server certificates.")
 	fTLSClient.Bool("tls-client-insecure-skip-verify", false, "skip backend's server certificates validation. INSECURE.")
 
-	fHealth.String("health-listen", ":8080", "listen address of the health server.")
-	fHealth.Bool("health-enable", false, "enables health server.")
-
-	fProfiler.String("profiling-listen", ":6060", "listen address of the health server.")
-	fProfiler.Bool("profiling-enable", false, "enables profiling server.")
+	fHealth.String("health-listen", "", "if set, start health server on that address.")
 
 	fPolicer.StringP("policer-type", "P", "", "type of policer to use. 'rego' or 'http'.")
 	fPolicer.String("policer-rego-policy", "", "path to a rego policy file for the rego policer.")

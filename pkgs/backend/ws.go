@@ -21,6 +21,7 @@ import (
 	"go.acuvity.ai/minibridge/pkgs/client"
 	"go.acuvity.ai/minibridge/pkgs/cors"
 	"go.acuvity.ai/minibridge/pkgs/data"
+	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/scan"
@@ -70,6 +71,17 @@ func (p *wsBackend) Start(ctx context.Context) error {
 	p.server.BaseContext = func(net.Listener) context.Context { return sctx }
 	p.server.RegisterOnShutdown(func() { cancel() })
 
+	if mm := p.cfg.metricsManager; mm != nil {
+		p.server.ConnState = func(conn net.Conn, state http.ConnState) {
+			switch state {
+			case http.StateNew:
+				mm.RegisterTCPConnection()
+			case http.StateClosed, http.StateHijacked:
+				mm.UnregisterTCPConnection()
+			}
+		}
+	}
+
 	go func() {
 		if p.server.TLSConfig == nil {
 			err := p.server.ListenAndServe()
@@ -108,6 +120,14 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	m := func(int) time.Duration { return 0 }
+	if mm := p.cfg.metricsManager; mm != nil {
+		m = mm.MeasureRequest(req.Method, req.URL.Path)
+
+		mm.RegisterWSConnection()
+		defer mm.UnregisterWSConnection()
+	}
+
 	if req.Method != http.MethodGet || req.URL.Path != "/ws" {
 		http.Error(w, "only supports GET /ws", http.StatusBadRequest)
 		return
@@ -117,6 +137,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		slog.Error("Unable to start mcp client", err)
 		http.Error(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError)
+		m(http.StatusInternalServerError)
 		return
 	}
 
@@ -125,6 +146,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case err := <-stream.Exit:
 		slog.Error("MCP server has exited", err)
 		http.Error(w, fmt.Sprintf("mcp server has exited: %s", err), http.StatusInternalServerError)
+		m(http.StatusInternalServerError)
 		return
 	}
 
@@ -137,14 +159,18 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ws, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		slog.Error("Unable to upgrade to websocket", err)
+		m(http.StatusInternalServerError)
 		return
 	}
 
 	session, err := wsc.Accept(req.Context(), ws, wsc.Config{WriteChanSize: 64, ReadChanSize: 16})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to accept websocket: %s", err), http.StatusBadRequest)
+		m(http.StatusBadRequest)
 		return
 	}
+
+	m(http.StatusSwitchingProtocols)
 
 	defer session.Close(1001)
 
@@ -164,7 +190,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from websocket", "msg", string(buf))
 
-			if buf, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, buf); err != nil {
+			if buf, err = policeData(req.Context(), p.cfg.metricsManager, p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, buf); err != nil {
 				if errors.Is(err, api.ErrBlocked) {
 					session.Write(data.Sanitize(buf))
 					continue
@@ -179,7 +205,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from MCP Server", "msg", string(buf))
 
-			if buf, err = policeData(req.Context(), p.cfg.policer, p.cfg.sbom, api.CallTypeResponse, agent, buf); err != nil {
+			if buf, err = policeData(req.Context(), p.cfg.metricsManager, p.cfg.policer, p.cfg.sbom, api.CallTypeResponse, agent, buf); err != nil {
 				if errors.Is(err, api.ErrBlocked) {
 					session.Write(data.Sanitize(buf))
 					continue
@@ -248,7 +274,7 @@ func parseBasicAuth(auth string) (password string, ok bool) {
 	return password, true
 }
 
-func policeData(ctx context.Context, pol policer.Policer, hashes scan.SBOM, typ api.CallType, agent api.Agent, data []byte) ([]byte, error) {
+func policeData(ctx context.Context, mm *metrics.Manager, pol policer.Policer, hashes scan.SBOM, rtype api.CallType, agent api.Agent, data []byte) ([]byte, error) {
 
 	call := api.MCPCall{}
 	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
@@ -295,8 +321,15 @@ func policeData(ctx context.Context, pol policer.Policer, hashes scan.SBOM, typ 
 		return data, nil
 	}
 
-	rcall, err := pol.Police(ctx, api.Request{Type: typ, Agent: agent, MCP: call})
+	m := func(bool) time.Duration { return 0 }
+	if mm != nil {
+		m = mm.MeasurePolicer(pol.Type(), rtype)
+	}
+
+	rcall, err := pol.Police(ctx, api.Request{Type: rtype, Agent: agent, MCP: call})
 	if err != nil {
+
+		defer m(false)
 
 		if errors.Is(err, api.ErrBlocked) {
 			return makeMCPError(call.ID, err), err
@@ -310,10 +343,12 @@ func policeData(ctx context.Context, pol policer.Policer, hashes scan.SBOM, typ 
 		// swap data
 		data, err = elemental.Encode(elemental.EncodingTypeJSON, rcall)
 		if err != nil {
+			defer m(false)
 			return nil, fmt.Errorf("unable to reencode modified mcp call: %w", err)
 		}
 
 	}
 
+	m(true)
 	return data, nil
 }

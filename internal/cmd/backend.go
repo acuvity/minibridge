@@ -65,7 +65,7 @@ var Backend = &cobra.Command{
 
 		clientOpts := makeMCPClientOptions()
 
-		startHelperServers(cmd.Context())
+		mm := startHealthServer(cmd.Context())
 
 		mcpServer, err := client.NewMCPServer(args[0], args[1:]...)
 		if err != nil {
@@ -89,6 +89,7 @@ var Backend = &cobra.Command{
 			backend.OptWSCORSPolicy(corsPolicy),
 			backend.OptSBOM(sbom),
 			backend.OptClientOptions(clientOpts...),
+			backend.OptMetricsManager(mm),
 		)
 
 		return proxy.Start(cmd.Context())

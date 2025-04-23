@@ -50,6 +50,8 @@ func New(policy string) (*Policer, error) {
 	}, nil
 }
 
+func (p *Policer) Type() string { return "rego" }
+
 func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, error) {
 
 	res, err := p.queryAllow.Eval(ctx, rego.EvalInput(preq), rego.EvalPrintHook(printer{}))

@@ -97,7 +97,7 @@ var AIO = &cobra.Command{
 
 		clientOpts := makeMCPClientOptions()
 
-		startHelperServers(ctx)
+		mm := startHealthServer(ctx)
 
 		iport, err := randomFreePort()
 		if err != nil {
@@ -129,6 +129,7 @@ var AIO = &cobra.Command{
 				backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
 				backend.OptSBOM(sbom),
 				backend.OptClientOptions(clientOpts...),
+				backend.OptMetricsManager(mm),
 			)
 
 			return proxy.Start(ctx)
@@ -164,6 +165,7 @@ var AIO = &cobra.Command{
 					frontend.OptSSEAgentToken(agentToken),
 					frontend.OptSSEAgentTokenPassthrough(true),
 					frontend.OptSSECORSPolicy(corsPolicy),
+					frontend.OptMetricsManager(mm),
 				)
 			} else {
 

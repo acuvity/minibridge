@@ -33,6 +33,8 @@ func New(endpoint string, token string, tlsConfig *tls.Config) *Policer {
 	}
 }
 
+func (p *Policer) Type() string { return "http" }
+
 func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, error) {
 
 	body, err := elemental.Encode(elemental.EncodingTypeJSON, preq)
