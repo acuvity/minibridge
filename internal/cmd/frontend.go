@@ -29,6 +29,7 @@ func init() {
 	Frontend.Flags().AddFlagSet(fProfiler)
 	Frontend.Flags().AddFlagSet(fCORS)
 	Frontend.Flags().AddFlagSet(fAgentAuth)
+	Frontend.Flags().AddFlagSet(fOTEL)
 }
 
 // Frontend is the cobra command to run the client.
@@ -64,6 +65,11 @@ var Frontend = &cobra.Command{
 			return err
 		}
 
+		tracer, err := makeTracer(cmd.Context(), "backend")
+		if err != nil {
+			return fmt.Errorf("unable to configure tracer: %w", err)
+		}
+
 		corsPolicy := makeCORSPolicy()
 
 		mm := startHealthServer(cmd.Context())
@@ -94,7 +100,8 @@ var Frontend = &cobra.Command{
 				frontend.OptSSEAgentToken(agentToken),
 				frontend.OptSSEAgentTokenPassthrough(agentTokenPassthrough),
 				frontend.OptSSECORSPolicy(corsPolicy),
-				frontend.OptMetricsManager(mm),
+				frontend.OptSSEMetricsManager(mm),
+				frontend.OptSSETracer(tracer),
 			)
 
 		} else {
@@ -106,6 +113,7 @@ var Frontend = &cobra.Command{
 
 			proxy = frontend.NewStdio(backendURL, clientTLSConfig,
 				frontend.OptStioAgentToken(agentToken),
+				frontend.OptStdioTracer(tracer),
 			)
 		}
 

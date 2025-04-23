@@ -1,5 +1,7 @@
 package api
 
+import "time"
+
 // CallType type of request to the policer.
 type CallType string
 
@@ -8,6 +10,21 @@ var (
 	CallTypeRequest  CallType = "request"
 	CallTypeResponse CallType = "response"
 )
+
+// SpanContext contains information about the OTEL span
+// related to a Request.
+type SpanContext struct {
+	TraceID      string    `json:"traceID" `
+	ParentSpanID string    `json:"parentSpanID,omitempty"`
+	End          time.Time `json:"end"`
+	ID           string    `json:"ID"`
+	Name         string    `json:"name"`
+	Start        time.Time `json:"start"`
+}
+
+func (c SpanContext) IsValid() bool {
+	return c.TraceID != "" && c.ID != ""
+}
 
 // A Request represents the data sent to the Policer
 type Request struct {
@@ -22,6 +39,12 @@ type Request struct {
 
 	// Agent contains callers information.
 	Agent Agent `json:"agent,omitzero"`
+
+	// SpanContext contains info about the eventual OTEL span
+	// for the request. There are advanced use cases where you
+	// want correlation between a Request and the OTEL traces
+	// associated.
+	SpanContext SpanContext `json:"spanContext,omitzero"`
 }
 
 // Agent contains information about the caller of the request.

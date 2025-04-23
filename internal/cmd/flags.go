@@ -14,6 +14,7 @@ var (
 	fAgentAuth = pflag.NewFlagSet("agentauth", pflag.ExitOnError)
 	fSBOM      = pflag.NewFlagSet("sbom", pflag.ExitOnError)
 	fMCP       = pflag.NewFlagSet("mcp", pflag.ExitOnError)
+	fOTEL      = pflag.NewFlagSet("otel", pflag.ExitOnError)
 
 	initialized = false
 )
@@ -56,4 +57,10 @@ func initSharedFlagSet() {
 	fMCP.Int("mcp-gid", -1, "if greater than -1, use as GID to run the MCP server command.")
 	fMCP.IntSlice("mcp-groups", nil, "additional GIDs to to run the MCP server command.")
 	fMCP.Bool("mcp-use-tempdir", false, "if set, create a new temp execution dir for each MCP server instance.")
+	fMCP.String("mcp-server-name", "", "the name of server.")
+
+	fOTEL.String("otel-exporter", "", "if set, enable and send OTEL trace to that endpoint. format: host:port or ENV")
+	fOTEL.String("otel-exporter-ca", "", "path to a CA to validate OTEL server certificate.")
+	fOTEL.Bool("otel-exporter-insecure-skip-verify", false, "skip OTEL server certificates validation. INSECURE.")
+	fOTEL.Bool("otel-exporter-no-tls", false, "if set, connect to OTEL server without TLS. INSECURE.")
 }

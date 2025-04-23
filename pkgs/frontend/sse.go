@@ -16,6 +16,8 @@ import (
 	"go.acuvity.ai/minibridge/pkgs/cors"
 	"go.acuvity.ai/minibridge/pkgs/data"
 	"go.acuvity.ai/wsc"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type session struct {
@@ -53,7 +55,7 @@ func NewSSE(addr string, backend string, serverTLSConfig *tls.Config, clientTLSC
 
 	p.server = &http.Server{
 		Addr:              addr,
-		Handler:           p,
+		Handler:           otelhttp.NewHandler(http.HandlerFunc(p.ServeHTTP), "frontend"),
 		TLSConfig:         serverTLSConfig,
 		ReadHeaderTimeout: time.Second,
 	}
@@ -147,6 +149,9 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 		m = mm.MeasureRequest(req.Method, req.URL.Path)
 	}
 
+	ctx, span := p.cfg.tracer.Start(req.Context(), "sse")
+	defer span.End()
+
 	if req.Method != http.MethodGet {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		m(http.StatusMethodNotAllowed)
@@ -154,13 +159,15 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 	}
 
 	sid := uuid.Must(uuid.NewV6()).String()
+	span.SetAttributes(attribute.String("session", sid))
+
 	log := slog.With("sid", sid)
 
 	log.Debug("Handling new SSE", "client", req.RemoteAddr)
 
 	wsToken, wsAuthHeaders := p.getCreds(req)
 
-	ws, err := connectWS(req.Context(), p.backendURL, p.tlsConfig, agentInfo{
+	ws, err := connectWS(ctx, p.backendURL, p.tlsConfig, agentInfo{
 		token:       wsToken,
 		authHeaders: wsAuthHeaders,
 		remoteAddr:  req.RemoteAddr,
@@ -184,6 +191,7 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+	span.End()
 
 	rc := http.NewResponseController(w)
 
@@ -208,7 +216,7 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 		select {
 
-		case <-req.Context().Done():
+		case <-ctx.Done():
 			log.Debug("Client is gone from /sse")
 			return
 
@@ -244,6 +252,9 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 		m = p.cfg.metricsManager.MeasureRequest(req.Method, req.URL.Path)
 	}
 
+	_, span := p.cfg.tracer.Start(req.Context(), "message")
+	defer span.End()
+
 	if req.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		m(http.StatusMethodNotAllowed)
@@ -256,6 +267,7 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 		m(http.StatusBadRequest)
 		return
 	}
+	span.SetAttributes(attribute.String("session", sid))
 
 	accepts := req.Header.Get("Accept")
 

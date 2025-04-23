@@ -40,6 +40,7 @@ func init() {
 	AIO.Flags().AddFlagSet(fAgentAuth)
 	AIO.Flags().AddFlagSet(fSBOM)
 	AIO.Flags().AddFlagSet(fMCP)
+	AIO.Flags().AddFlagSet(fOTEL)
 }
 
 var AIO = &cobra.Command{
@@ -93,6 +94,11 @@ var AIO = &cobra.Command{
 			return fmt.Errorf("unable to make hashes: %w", err)
 		}
 
+		tracer, err := makeTracer(ctx, "aio")
+		if err != nil {
+			return fmt.Errorf("unable to configure tracer: %w", err)
+		}
+
 		corsPolicy := makeCORSPolicy()
 
 		clientOpts := makeMCPClientOptions()
@@ -125,11 +131,12 @@ var AIO = &cobra.Command{
 			slog.Info("Minibridge backend configured")
 
 			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
-				backend.OptWSPolicer(policer),
-				backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
+				backend.OptPolicer(policer),
+				backend.OptDumpStderrOnError(viper.GetString("log-format") != "json"),
 				backend.OptSBOM(sbom),
 				backend.OptClientOptions(clientOpts...),
 				backend.OptMetricsManager(mm),
+				backend.OptTracer(tracer),
 			)
 
 			return proxy.Start(ctx)
@@ -165,7 +172,8 @@ var AIO = &cobra.Command{
 					frontend.OptSSEAgentToken(agentToken),
 					frontend.OptSSEAgentTokenPassthrough(true),
 					frontend.OptSSECORSPolicy(corsPolicy),
-					frontend.OptMetricsManager(mm),
+					frontend.OptSSEMetricsManager(mm),
+					frontend.OptSSETracer(tracer),
 				)
 			} else {
 
@@ -176,6 +184,7 @@ var AIO = &cobra.Command{
 				proxy = frontend.NewStdio(backendURL, frontendClientTLSConfig,
 					frontend.OptStdioRetry(false),
 					frontend.OptStioAgentToken(agentToken),
+					frontend.OptStdioTracer(tracer),
 				)
 			}
 

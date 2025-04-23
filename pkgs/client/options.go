@@ -1,6 +1,9 @@
 package client
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 type creds struct {
 	Uid    uint32
@@ -33,15 +36,23 @@ func OptUseTempDir(use bool) Option {
 func OptCredentials(uid int, gid int, groups []int) Option {
 	return func(c *cfg) {
 
-		grps := make([]uint32, len(groups))
+		grps := make([]uint32, 0, len(groups))
 
 		for i, g := range groups {
 
-			if g > math.MaxUint32 {
-				panic("invalid group. overflows")
+			if g < 0 {
+				continue
 			}
 
-			grps[i] = uint32(g) // #nosec: G115
+			if g > math.MaxUint32 {
+				panic(fmt.Sprintf("invalid group %d. overflows", i))
+			}
+
+			grps = append(grps, uint32(g)) // #nosec: G115
+		}
+
+		if len(grps) == 0 && uid < 0 && gid < 0 {
+			return
 		}
 
 		c.creds = &creds{Groups: grps}

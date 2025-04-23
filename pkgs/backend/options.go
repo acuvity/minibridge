@@ -6,6 +6,8 @@ import (
 	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/scan"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 type wsCfg struct {
@@ -15,33 +17,36 @@ type wsCfg struct {
 	sbom           scan.SBOM
 	clientOpts     []client.Option
 	metricsManager *metrics.Manager
+	tracer         trace.Tracer
 }
 
 func newWSCfg() wsCfg {
-	return wsCfg{}
+	return wsCfg{
+		tracer: noop.NewTracerProvider().Tracer("noop"),
+	}
 }
 
 // OptWS are options that can be given to NewStdio().
 type OptWS func(*wsCfg)
 
-// OptWSPolicer sets the Policer to forward the traffic to.
-func OptWSPolicer(policer policer.Policer) OptWS {
+// OptPolicer sets the Policer to forward the traffic to.
+func OptPolicer(policer policer.Policer) OptWS {
 	return func(cfg *wsCfg) {
 		cfg.policer = policer
 	}
 }
 
-// OptWSDumpStderrOnError controls whether the WS server should
+// OptDumpStderrOnError controls whether the WS server should
 // dump the stderr of the MCP server as is, or in a log.
-func OptWSDumpStderrOnError(dump bool) OptWS {
+func OptDumpStderrOnError(dump bool) OptWS {
 	return func(cfg *wsCfg) {
 		cfg.dumpStderr = dump
 	}
 }
 
-// OptWSCORSPolicy sets the bahamut.CORSPolicy to use for
+// OptCORSPolicy sets the bahamut.CORSPolicy to use for
 // connection originating from a webrowser.
-func OptWSCORSPolicy(policy *bahamut.CORSPolicy) OptWS {
+func OptCORSPolicy(policy *bahamut.CORSPolicy) OptWS {
 	return func(cfg *wsCfg) {
 		cfg.corsPolicy = policy
 	}
@@ -67,5 +72,15 @@ func OptClientOptions(opts ...client.Option) OptWS {
 func OptMetricsManager(m *metrics.Manager) OptWS {
 	return func(cfg *wsCfg) {
 		cfg.metricsManager = m
+	}
+}
+
+// OptTracer sets the otel trace.Tracer to use to trace requests
+func OptTracer(tracer trace.Tracer) OptWS {
+	return func(cfg *wsCfg) {
+		if tracer == nil {
+			tracer = noop.NewTracerProvider().Tracer("noop")
+		}
+		cfg.tracer = tracer
 	}
 }

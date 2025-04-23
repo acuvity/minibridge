@@ -51,7 +51,7 @@ reasons contains msg if {
 # it will be denied by the rule above. This allows the agent to not loose time
 # trying a tool that will be denied anyways
 mcp := x if {
-	input.mcp.method == "tools/call"
+	input.mcp.result.tools
 	claims.email == "bob@example.com"
 
 	x := json.patch(input.mcp, [{

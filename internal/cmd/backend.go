@@ -27,6 +27,7 @@ func init() {
 	Backend.Flags().AddFlagSet(fCORS)
 	Backend.Flags().AddFlagSet(fSBOM)
 	Backend.Flags().AddFlagSet(fMCP)
+	Backend.Flags().AddFlagSet(fOTEL)
 }
 
 // Backend is the cobra command to run the server.
@@ -61,6 +62,11 @@ var Backend = &cobra.Command{
 			return fmt.Errorf("unable to make hashes: %w", err)
 		}
 
+		tracer, err := makeTracer(cmd.Context(), "backend")
+		if err != nil {
+			return fmt.Errorf("unable to configure tracer: %w", err)
+		}
+
 		corsPolicy := makeCORSPolicy()
 
 		clientOpts := makeMCPClientOptions()
@@ -84,12 +90,13 @@ var Backend = &cobra.Command{
 		)
 
 		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,
-			backend.OptWSPolicer(policer),
-			backend.OptWSDumpStderrOnError(viper.GetString("log-format") != "json"),
-			backend.OptWSCORSPolicy(corsPolicy),
+			backend.OptPolicer(policer),
+			backend.OptDumpStderrOnError(viper.GetString("log-format") != "json"),
+			backend.OptCORSPolicy(corsPolicy),
 			backend.OptSBOM(sbom),
 			backend.OptClientOptions(clientOpts...),
 			backend.OptMetricsManager(mm),
+			backend.OptTracer(tracer),
 		)
 
 		return proxy.Start(cmd.Context())

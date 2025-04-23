@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -16,16 +15,20 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/gorilla/websocket"
+	"github.com/karlseguin/ccache/v3"
 	"github.com/smallnest/ringbuffer"
 	"go.acuvity.ai/elemental"
 	"go.acuvity.ai/minibridge/pkgs/client"
 	"go.acuvity.ai/minibridge/pkgs/cors"
 	"go.acuvity.ai/minibridge/pkgs/data"
-	"go.acuvity.ai/minibridge/pkgs/metrics"
-	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/scan"
 	"go.acuvity.ai/wsc"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type wsBackend struct {
@@ -52,7 +55,7 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServ
 	p.server = &http.Server{
 		TLSConfig:         tlsConfig,
 		Addr:              listen,
-		Handler:           p,
+		Handler:           otelhttp.NewHandler(http.HandlerFunc(p.ServeHTTP), "backend"),
 		ReadHeaderTimeout: time.Second,
 	}
 
@@ -120,23 +123,25 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	ctx, span := p.cfg.tracer.Start(req.Context(), "backend")
+	defer span.End()
+
 	m := func(int) time.Duration { return 0 }
 	if mm := p.cfg.metricsManager; mm != nil {
 		m = mm.MeasureRequest(req.Method, req.URL.Path)
-
 		mm.RegisterWSConnection()
 		defer mm.UnregisterWSConnection()
 	}
 
 	if req.Method != http.MethodGet || req.URL.Path != "/ws" {
-		http.Error(w, "only supports GET /ws", http.StatusBadRequest)
+		hErr(w, "only supports GET /ws", http.StatusBadRequest, span)
 		return
 	}
 
-	stream, err := client.NewStdio(p.mcpServer, p.cfg.clientOpts...).Start(req.Context())
+	stream, err := client.NewStdio(p.mcpServer, p.cfg.clientOpts...).Start(ctx)
 	if err != nil {
 		slog.Error("Unable to start mcp client", err)
-		http.Error(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError)
+		hErr(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError, span)
 		m(http.StatusInternalServerError)
 		return
 	}
@@ -145,7 +150,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	default:
 	case err := <-stream.Exit:
 		slog.Error("MCP server has exited", err)
-		http.Error(w, fmt.Sprintf("mcp server has exited: %s", err), http.StatusInternalServerError)
+		hErr(w, fmt.Sprintf("mcp server has exited: %s", err), http.StatusInternalServerError, span)
 		m(http.StatusInternalServerError)
 		return
 	}
@@ -163,13 +168,14 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	session, err := wsc.Accept(req.Context(), ws, wsc.Config{WriteChanSize: 64, ReadChanSize: 16})
+	session, err := wsc.Accept(ctx, ws, wsc.Config{WriteChanSize: 64, ReadChanSize: 16})
 	if err != nil {
-		http.Error(w, fmt.Sprintf("unable to accept websocket: %s", err), http.StatusBadRequest)
+		hErr(w, fmt.Sprintf("unable to accept websocket: %s", err), http.StatusBadRequest, span)
 		m(http.StatusBadRequest)
 		return
 	}
 
+	span.End()
 	m(http.StatusSwitchingProtocols)
 
 	defer session.Close(1001)
@@ -182,6 +188,8 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		UserAgent:  req.Header.Get("X-Forwarded-UA"),
 	}
 
+	cache := ccache.New(ccache.Configure[context.Context]().MaxSize(64))
+
 	for {
 
 		select {
@@ -190,12 +198,8 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from websocket", "msg", string(buf))
 
-			if buf, err = policeData(req.Context(), p.cfg.metricsManager, p.cfg.policer, p.cfg.sbom, api.CallTypeRequest, agent, buf); err != nil {
-				if errors.Is(err, api.ErrBlocked) {
-					session.Write(data.Sanitize(buf))
-					continue
-				}
-				slog.Error("Unable to police request", err)
+			if buf, err = p.handleMCPCall(ctx, cache, session, agent, buf, api.CallTypeRequest); err != nil {
+				slog.Error("Unable to handle mcp agent message", err)
 				continue
 			}
 
@@ -205,12 +209,8 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from MCP Server", "msg", string(buf))
 
-			if buf, err = policeData(req.Context(), p.cfg.metricsManager, p.cfg.policer, p.cfg.sbom, api.CallTypeResponse, agent, buf); err != nil {
-				if errors.Is(err, api.ErrBlocked) {
-					session.Write(data.Sanitize(buf))
-					continue
-				}
-				slog.Error("Unable to police response", err)
+			if buf, err = p.handleMCPCall(ctx, cache, session, agent, buf, api.CallTypeResponse); err != nil {
+				slog.Error("Unable to handle mcp server message", err)
 				continue
 			}
 
@@ -221,11 +221,13 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			slog.Debug("MCP Server Log", "stderr", string(data))
 
 		case err := <-stream.Exit:
+
 			select {
+			default:
 			case data := <-stream.Stderr:
 				_, _ = rb.Write(data)
-			default:
 			}
+
 			data, _ := io.ReadAll(rb)
 			slog.Error("MCP Server exited", err)
 
@@ -234,55 +236,73 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			} else {
 				slog.Error("MCP Server stderr", "stderr", string(data))
 			}
+
+			return
+
+		case err := <-session.Error():
+			slog.Debug("Websocket encoountered and error", err)
 			return
 
 		case <-session.Done():
 			slog.Debug("Websocket has closed")
 			return
 
-		case <-req.Context().Done():
+		case <-ctx.Done():
 			slog.Debug("Client is gone")
 			return
 		}
 	}
 }
 
-func parseBasicAuth(auth string) (password string, ok bool) {
-
-	const prefix = "Basic "
-
-	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
-
-		parts := strings.SplitN(auth, " ", 2)
-		if len(parts) == 2 {
-			return parts[1], true
-		}
-		return "", false
-	}
-
-	c, err := base64.StdEncoding.DecodeString(auth[len(prefix):])
-	if err != nil {
-		return "", false
-	}
-
-	cs := string(c)
-
-	if _, password, ok = strings.Cut(cs, ":"); !ok {
-		return "", false
-	}
-
-	return password, true
-}
-
-func policeData(ctx context.Context, mm *metrics.Manager, pol policer.Policer, hashes scan.SBOM, rtype api.CallType, agent api.Agent, data []byte) ([]byte, error) {
+func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[context.Context], session wsc.Websocket, agent api.Agent, buf []byte, rtype api.CallType) (buff []byte, err error) {
 
 	call := api.MCPCall{}
-	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
+	if err := elemental.Decode(elemental.EncodingTypeJSON, buf, &call); err != nil {
 		return nil, fmt.Errorf("unable to decode mcp call: %w", err)
 	}
 
+	// We check if we have the _meta params in the call and if so, we get the otel context from there.
+	mc := newMCPMetaCarrier(call)
+	if len(mc.meta) > 0 {
+		ctx = otel.GetTextMapPropagator().Extract(ctx, mc)
+	}
+
+	kind := trace.SpanKindClient
+	if rtype == api.CallTypeResponse {
+		kind = trace.SpanKindServer
+	}
+
+	ctx, pctx, lspan, name := spanContextFromCache(ctx, cache, p.cfg.tracer, call, kind)
+	defer lspan.End()
+
+	var spc *api.SpanContext
+	if sc := trace.SpanContextFromContext(ctx); sc.IsValid() {
+		spc = &api.SpanContext{}
+		spc.TraceID = sc.TraceID().String()
+		spc.ID = sc.SpanID().String()
+		spc.Start = time.Now()
+		spc.Name = name
+
+		if parentCtx := trace.SpanContextFromContext(pctx); parentCtx.IsValid() {
+			spc.ParentSpanID = parentCtx.SpanID().String()
+		}
+	}
+
+	if buf, err = p.police(ctx, spc, rtype, agent, call, buf); err != nil {
+		if errors.Is(err, api.ErrBlocked) {
+			session.Write(data.Sanitize(buf))
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unable to police mcp call: %w", err)
+	}
+
+	return buf, nil
+}
+
+func (p *wsBackend) police(ctx context.Context, spc *api.SpanContext, rtype api.CallType, agent api.Agent, call api.MCPCall, rawData []byte) ([]byte, error) {
+
 	// This is tools/list response, if we have hashes for them, we verify their integrity.
-	if dtools, ok := call.Result["tools"]; ok && len(hashes.Tools) > 0 {
+	if dtools, ok := call.Result["tools"]; ok && len(p.cfg.sbom.Tools) > 0 {
 
 		tools := api.Tools{}
 		if err := mapstructure.Decode(dtools, &tools); err != nil {
@@ -294,13 +314,13 @@ func policeData(ctx context.Context, mm *metrics.Manager, pol policer.Policer, h
 			return nil, fmt.Errorf("unable to hash tools result: %w", err)
 		}
 
-		if err := hashes.Tools.Matches(lhashes); err != nil {
+		if err := p.cfg.sbom.Tools.Matches(lhashes); err != nil {
 			return makeMCPError(call.ID, err), fmt.Errorf("%w: %w", api.ErrBlocked, err)
 		}
 	}
 
 	// This is prompts/list response, if we have hashes for them, we verify their integrity.
-	if dtools, ok := call.Result["prompts"]; ok && len(hashes.Prompts) > 0 {
+	if dtools, ok := call.Result["prompts"]; ok && len(p.cfg.sbom.Prompts) > 0 {
 
 		prompts := api.Prompts{}
 		if err := mapstructure.Decode(dtools, &prompts); err != nil {
@@ -312,36 +332,51 @@ func policeData(ctx context.Context, mm *metrics.Manager, pol policer.Policer, h
 			return nil, fmt.Errorf("unable to hash prompts result: %w", err)
 		}
 
-		if err := hashes.Prompts.Matches(lhashes); err != nil {
+		if err := p.cfg.sbom.Prompts.Matches(lhashes); err != nil {
 			return makeMCPError(call.ID, err), fmt.Errorf("%w: %w", api.ErrBlocked, err)
 		}
 	}
 
-	if pol == nil {
-		return data, nil
+	if p.cfg.policer == nil {
+		return rawData, nil
 	}
 
 	m := func(bool) time.Duration { return 0 }
-	if mm != nil {
-		m = mm.MeasurePolicer(pol.Type(), rtype)
+	if mm := p.cfg.metricsManager; mm != nil {
+		m = mm.MeasurePolicer(p.cfg.policer.Type(), rtype)
 	}
 
-	rcall, err := pol.Police(ctx, api.Request{Type: rtype, Agent: agent, MCP: call})
+	ctx, span := p.cfg.tracer.Start(ctx, "policer")
+	defer span.End()
+
+	req := api.Request{
+		Type:  rtype,
+		MCP:   call,
+		Agent: agent,
+	}
+	if spc != nil {
+		req.SpanContext = *spc
+		req.SpanContext.End = time.Now()
+	}
+
+	rcall, err := p.cfg.policer.Police(ctx, req)
 	if err != nil {
 
 		defer m(false)
 
 		if errors.Is(err, api.ErrBlocked) {
+			span.SetStatus(codes.Error, err.Error())
 			return makeMCPError(call.ID, err), err
 		}
 
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("unable to run policer.Police: %w", err)
 	}
 
 	if rcall != nil {
 
 		// swap data
-		data, err = elemental.Encode(elemental.EncodingTypeJSON, rcall)
+		rawData, err = elemental.Encode(elemental.EncodingTypeJSON, rcall)
 		if err != nil {
 			defer m(false)
 			return nil, fmt.Errorf("unable to reencode modified mcp call: %w", err)
@@ -350,5 +385,81 @@ func policeData(ctx context.Context, mm *metrics.Manager, pol policer.Policer, h
 	}
 
 	m(true)
-	return data, nil
+	span.SetStatus(codes.Ok, "")
+
+	return rawData, nil
+}
+
+func spanContextFromCache(
+	ctx context.Context,
+	cache *ccache.Cache[context.Context],
+	tracer trace.Tracer,
+	call api.MCPCall,
+	kind trace.SpanKind,
+) (context.Context, context.Context, trace.Span, string) {
+
+	cid := call.IDString()
+
+	name := "mcp.agent"
+	if kind == trace.SpanKindServer {
+		name = "mcp.server"
+	}
+
+	if cid == "" {
+		rctx, rspan := tracer.Start(ctx, name,
+			trace.WithAttributes(
+				attribute.String("type", "notification"),
+				attribute.String("mcp.method", call.Method),
+			),
+			trace.WithSpanKind(kind),
+		)
+		return rctx, nil, rspan, name
+	}
+
+	attrs := []attribute.KeyValue{}
+
+	cached := false
+	if item := cache.Get(cid); item != nil && !item.Expired() {
+		ctx = item.Value()
+		cache.Delete(cid)
+		cached = true
+	}
+
+	if call.Error != nil {
+		attrs = append(attrs,
+			attribute.String("mcp.type", "response"),
+			attribute.Bool("error", true),
+		)
+
+	} else if call.Result != nil {
+		attrs = append(attrs, attribute.String("mcp.type", "response"))
+	} else {
+		attrs = append(attrs,
+			attribute.String("mcp.type", "request"),
+			attribute.String("mcp.method", call.Method),
+		)
+
+		if call.Method == "tools/call" {
+			if n, ok := call.Params["name"].(string); ok {
+				attrs = append(attrs, attribute.String("name", n))
+			}
+
+			if args, ok := call.Params["arguments"].(map[string]any); ok {
+				for k, v := range args {
+					attrs = append(attrs, attribute.String(fmt.Sprintf("mcp.param.%s", k), fmt.Sprintf("%v", v)))
+				}
+			}
+		}
+	}
+
+	rctx, span := tracer.Start(ctx, name,
+		trace.WithAttributes(attrs...),
+		trace.WithSpanKind(kind),
+	)
+
+	if !cached {
+		cache.Set(cid, rctx, time.Minute)
+	}
+
+	return rctx, ctx, span, name
 }

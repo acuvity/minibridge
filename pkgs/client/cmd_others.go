@@ -7,6 +7,6 @@ import (
 	"syscall"
 )
 
-func setCaps(cmd *exec.Cmd, chroot string, creds *creds) {
+func setCaps(cmd *exec.Cmd, _ string, _ *creds) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 }

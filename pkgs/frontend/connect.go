@@ -10,6 +10,8 @@ import (
 	"net/http"
 
 	"go.acuvity.ai/wsc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 type agentInfo struct {
@@ -42,6 +44,8 @@ func connectWS(ctx context.Context, backendURL string, tlsConfig *tls.Config, in
 		"X-Forwarded-UA":  {info.userAgent},
 		"X-Forwarded-For": {info.remoteAddr},
 	}
+
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(wsconfig.Headers))
 
 	if tlsConfig != nil {
 		if info.token != "" {

@@ -1,5 +1,7 @@
 package api
 
+import "fmt"
+
 type ProtocolVersion string
 
 var (
@@ -35,6 +37,15 @@ func NewMCPCall(id int) MCPCall {
 	}
 
 	return c
+}
+
+func (c *MCPCall) IDString() string {
+
+	if c.ID == nil {
+		return ""
+	}
+
+	return fmt.Sprintf("%s", c.ID)
 }
 
 func NewInitCall(proto ProtocolVersion) MCPCall {

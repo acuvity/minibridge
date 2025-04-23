@@ -3,6 +3,8 @@ package frontend
 import (
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/metrics"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 type sseCfg struct {
@@ -12,12 +14,14 @@ type sseCfg struct {
 	agentToken            string
 	corsPolicy            *bahamut.CORSPolicy
 	metricsManager        *metrics.Manager
+	tracer                trace.Tracer
 }
 
 func newSSECfg() sseCfg {
 	return sseCfg{
 		sseEndpoint:      "/sse",
 		messagesEndpoint: "/message",
+		tracer:           noop.NewTracerProvider().Tracer("noop"),
 	}
 }
 
@@ -67,22 +71,34 @@ func OptSSEAgentTokenPassthrough(passthrough bool) OptSSE {
 	}
 }
 
-// OptMetricsManager sets the metric manager to use to collect
+// OptSSEMetricsManager sets the metric manager to use to collect
 // prometheus metrics.
-func OptMetricsManager(m *metrics.Manager) OptSSE {
+func OptSSEMetricsManager(m *metrics.Manager) OptSSE {
 	return func(cfg *sseCfg) {
 		cfg.metricsManager = m
+	}
+}
+
+// OptSSETracer sets the otel trace.Tracer to use to trace requests
+func OptSSETracer(tracer trace.Tracer) OptSSE {
+	return func(cfg *sseCfg) {
+		if tracer == nil {
+			tracer = noop.NewTracerProvider().Tracer("noop")
+		}
+		cfg.tracer = tracer
 	}
 }
 
 type stdioCfg struct {
 	retry      bool
 	agentToken string
+	tracer     trace.Tracer
 }
 
 func newStdioCfg() stdioCfg {
 	return stdioCfg{
-		retry: true,
+		retry:  true,
+		tracer: noop.NewTracerProvider().Tracer("noop"),
 	}
 }
 
@@ -102,5 +118,15 @@ func OptStdioRetry(retry bool) OptStdio {
 func OptStioAgentToken(tokenString string) OptStdio {
 	return func(cfg *stdioCfg) {
 		cfg.agentToken = tokenString
+	}
+}
+
+// OptStdioTracer sets the otel trace.Tracer to use to trace requests
+func OptStdioTracer(tracer trace.Tracer) OptStdio {
+	return func(cfg *stdioCfg) {
+		if tracer == nil {
+			tracer = noop.NewTracerProvider().Tracer("noop")
+		}
+		cfg.tracer = tracer
 	}
 }
