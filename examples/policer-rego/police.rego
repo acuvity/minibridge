@@ -2,8 +2,12 @@ package main
 
 import rego.v1
 
-default allow = false
+# the call is allowed is we don't have any reason to deny it.
+allow if {
+	count(reasons) == 0
+}
 
+# verifies the claims from the JWT of the agent.
 claims := x if {
 	[verified, _, x] := io.jwt.decode_verify(
 		input.agent.token,
@@ -16,11 +20,15 @@ claims := x if {
 	verified == true
 }
 
+# if we have no claims, we add a deny reason.
 reasons contains msg if {
 	not claims
 	msg := "You must provide a valid token"
 }
 
+# if the call is a tools/call and the name
+# is printEnv and the user is not Alice,
+# we add a deny reason.
 reasons contains msg if {
 	input.mcp.method == "tools/call"
 	input.mcp.params.name == "printEnv"
@@ -28,7 +36,22 @@ reasons contains msg if {
 	msg := "only alice can run printEnv"
 }
 
+# if the call is a tools/call and the name
+# is longRunningOperation and the user is Bob,
+# we add a deny reason.
+reasons contains msg if {
+	input.mcp.method == "tools/call"
+	claims.email == "bob@example.com"
+	input.mcp.params.name == "longRunningOperation"
+	msg := "only alice can run printEnv"
+}
+
+# if the call is a tools/call and the request is from Bob, we remove the
+# longRunningOperation from the response. If Bob still tries to call that tool,
+# it will be denied by the rule above. This allows the agent to not loose time
+# trying a tool that will be denied anyways
 mcp := x if {
+	input.mcp.method == "tools/call"
 	claims.email == "bob@example.com"
 
 	x := json.patch(input.mcp, [{
@@ -36,8 +59,4 @@ mcp := x if {
 		"path": "/result/tools",
 		"value": [x | x := input.mcp.result.tools[_]; x.name != "longRunningOperation"],
 	}])
-}
-
-allow if {
-	count(reasons) == 0
 }
