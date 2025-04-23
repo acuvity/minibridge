@@ -490,4 +490,5 @@ Minibridge is still missing the following features:
 - [x] Transport user information over the websocket channel
 - [x] Support for user extraction to pass to the policer
 - [ ] Optimize communications between front/back in aio mode
-- [ ] Plug in prometheus metrics
+- [x] Plug in prometheus metrics
+- [ ] Opentracing
