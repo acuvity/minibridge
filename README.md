@@ -1,14 +1,20 @@
 # Minibridge
 
 Minibridge serves as a backend-to-frontend bridge, streamlining and securing
-communication between Agents and MCP servers. It safely exposes MCP servers to
-the internet and can optionally integrate with generic policing services — known
-as Policers — for agent authentication, content analysis, and transformation.
-Policers can be implemented remotely via HTTP or locally using OPA Rego
-policies.
+communication between Agents and MCP servers. It safely exposes [MCP
+servers](https://modelcontextprotocol.io) to the internet and can optionally
+integrate with generic policing services — known as Policers — for agent
+authentication, content analysis, and transformation. Policers can be
+implemented remotely via HTTP or locally using [OPA
+Rego](https://www.openpolicyagent.org/docs/latest/policy-reference/) policies.
 
-Additionally, Minibridge can help ensure the integrity of MCP servers through
+Minibridge can help ensure the integrity of MCP servers through
 SBOM (Software Bill of Materials) generation and real-time validation.
+
+MAdditionally, inibridge supports [OTEL](https://opentelemetry.io/) and can
+report/rettach spans from classical OTEL headers, as well as directly from the
+MCP call, as inserted by certain tool like [Open
+Inference](https://arize-ai.github.io/openinference).
 
 ## Table of Content
 
@@ -34,6 +40,7 @@ SBOM (Software Bill of Materials) generation and real-time validation.
   * [Agent Authentication](#agent-authentication)
     * [Global](#global)
     * [Forward](#forward)
+* [OTEL](#otel)
 * [Todos](#todos)
 
 <!-- vim-markdown-toc -->
@@ -482,13 +489,27 @@ To start the frontend in that mode:
 
     minibridge frontend -l :8000 -A wss://backend.minibridge.acme.com/ws --agent-token-passthrough
 
+## OTEL
+
+Minibridge support OpenTelemetry and can be configured to export spans with the
+following flags:
+
+- `--otel-exporter`: exporter endpoint, in the form `host:port` or `ENV`. If
+  `ENV` is set, minibridge will read OTEL configuration from the [standard
+  env variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/).
+- `--otel-exporter-ca`: path to a CA to verify the exporter server certificates.
+
+If no `--otel-exporter` is set, Minibridge will use an internal tracer to
+extract, add and inject spans. It will not report them, however they will be
+passed to the Policer, that can reconstruct a call graph if necessary.
+
 ## Todos
 
 Minibridge is still missing the following features:
 
-- [ ] Unit tests
 - [x] Transport user information over the websocket channel
 - [x] Support for user extraction to pass to the policer
-- [ ] Optimize communications between front/back in aio mode
 - [x] Plug in prometheus metrics
-- [ ] Opentracing
+- [x] Opentracing
+- [ ] Unit tests (started)
+- [ ] Optimize communications between front/back in aio mode
