@@ -19,6 +19,7 @@ import (
 	"go.acuvity.ai/tg/tglib"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -278,81 +279,56 @@ func makeMCPClientOptions() []client.Option {
 
 func makeTracer(ctx context.Context, name string) (trace.Tracer, error) {
 
-	endpoint := viper.GetString("otel-exporter")
-	ca := viper.GetString("otel-exporter-ca")
-	notls := viper.GetBool("otel-exporter-no-tls")
-	skip := viper.GetBool("otel-exporter-insecure-skip-verify")
+	var err error
+	var exp sdktrace.SpanExporter
 
-	res := resource.NewSchemaless(
-		attribute.String("service.name", "minibridge"),
-	)
-
-	if endpoint == "" {
-		tp := sdktrace.NewTracerProvider(sdktrace.WithResource(res))
-		otel.SetTracerProvider(tp)
-		otel.SetTextMapPropagator(propagation.TraceContext{})
-		return tp.Tracer(name), nil
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if e := os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"); e != "" {
+		endpoint = e
 	}
 
-	var opts []otlptracehttp.Option
-
-	if endpoint != "ENV" {
-
-		if skip {
-			slog.Warn("Certificate validation deactivated for OTEL exporter. Connection will not be secure")
-		}
-
-		var pool *x509.CertPool
-
-		if ca != "" {
-			certs, err := tglib.ParseCertificatePEMs(ca)
-			if err != nil {
-				return nil, fmt.Errorf("unable to load exporter ca: %w", err)
-			}
-			pool := x509.NewCertPool()
-			for _, cert := range certs {
-				pool.AddCert(cert)
-			}
-		}
-
-		opts = []otlptracehttp.Option{
-			otlptracehttp.WithEndpoint(endpoint),
-			otlptracehttp.WithTLSClientConfig(
-				&tls.Config{
-					RootCAs:            pool,
-					InsecureSkipVerify: skip, // #nosec: G402
-				},
+	opts := []sdktrace.TracerProviderOption{
+		sdktrace.WithResource(
+			resource.NewSchemaless(
+				attribute.String("service.name", "minibridge"),
 			),
-		}
-
-		if notls {
-			opts = append(opts, otlptracehttp.WithInsecure())
-		}
+		),
 	}
 
-	exp, err := otlptracehttp.New(ctx, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize stdouttrace exporter: %w", err)
+	if endpoint != "" {
+		proto := os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL")
+		if p := os.Getenv("OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"); p != "" {
+			proto = p
+		}
+
+		if proto == "" {
+			proto = "http/protobuf"
+		}
+
+		if proto == "grpc" {
+			exp, err = otlptracegrpc.New(ctx)
+		} else {
+			exp, err = otlptracehttp.New(ctx)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize OTEL %s exporter: %w", proto, err)
+		}
+
+		slog.Info("OTEL exporter configured", "proto", proto)
+		opts = append(opts, sdktrace.WithBatcher(exp))
 	}
 
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp),
-		sdktrace.WithResource(res),
-	)
+	tp := sdktrace.NewTracerProvider(opts...)
 
 	go func() {
 		<-ctx.Done()
-
 		sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-
 		_ = tp.Shutdown(sctx)
 	}()
 
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-	slog.Info("OTEL exporter configured", "endpoint", endpoint)
 
 	return tp.Tracer(name), nil
 }

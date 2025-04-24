@@ -29,7 +29,6 @@ func init() {
 	Frontend.Flags().AddFlagSet(fProfiler)
 	Frontend.Flags().AddFlagSet(fCORS)
 	Frontend.Flags().AddFlagSet(fAgentAuth)
-	Frontend.Flags().AddFlagSet(fOTEL)
 }
 
 // Frontend is the cobra command to run the client.

@@ -27,7 +27,6 @@ func init() {
 	Backend.Flags().AddFlagSet(fCORS)
 	Backend.Flags().AddFlagSet(fSBOM)
 	Backend.Flags().AddFlagSet(fMCP)
-	Backend.Flags().AddFlagSet(fOTEL)
 }
 
 // Backend is the cobra command to run the server.

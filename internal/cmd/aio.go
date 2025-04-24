@@ -40,7 +40,6 @@ func init() {
 	AIO.Flags().AddFlagSet(fAgentAuth)
 	AIO.Flags().AddFlagSet(fSBOM)
 	AIO.Flags().AddFlagSet(fMCP)
-	AIO.Flags().AddFlagSet(fOTEL)
 }
 
 var AIO = &cobra.Command{

@@ -491,17 +491,8 @@ To start the frontend in that mode:
 
 ## OTEL
 
-Minibridge support OpenTelemetry and can be configured to export spans with the
-following flags:
-
-- `--otel-exporter`: exporter endpoint, in the form `host:port` or `ENV`. If
-  `ENV` is set, minibridge will read OTEL configuration from the [standard
-  env variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/).
-- `--otel-exporter-ca`: path to a CA to verify the exporter server certificates.
-
-If no `--otel-exporter` is set, Minibridge will use an internal tracer to
-extract, add and inject spans. It will not report them, however they will be
-passed to the Policer, that can reconstruct a call graph if necessary.
+Minibridge support OpenTelemetry and can be configured to export spans using the
+OTEL [standard env variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/)
 
 ## Todos
 
@@ -510,6 +501,6 @@ Minibridge is still missing the following features:
 - [x] Transport user information over the websocket channel
 - [x] Support for user extraction to pass to the policer
 - [x] Plug in prometheus metrics
-- [x] Opentracing
+- [x] Opentelemetry
 - [ ] Unit tests (started)
 - [ ] Optimize communications between front/back in aio mode
