@@ -16,6 +16,8 @@ report/rettach spans from classical OTEL headers, as well as directly from the
 MCP call, as inserted by certain tool like [Open
 Inference](https://arize-ai.github.io/openinference).
 
+![arch-overview](assets/imgs/mb-arch-overview.png)
+
 ## Table of Content
 
 <!-- vim-markdown-toc GFM -->
@@ -67,14 +69,6 @@ You can connect directly using an HTTP client:
       -X POST \
       -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 
-The flow will look like the following:
-
-```mermaid
-flowchart LR
-    agent -- http+sse --> minibridge
-    minibridge -- stdio --> mcpserver
-```
-
 In order to secure the connections, you need to enable HTTPS for incoming
 connections:
 
@@ -117,14 +111,6 @@ You can now connect directly using a websocket client:
 
 > NOTE: Today, Minibridge backend only supports MCP server over stdio.
 
-The flow will look like the following:
-
-```mermaid
-flowchart LR
-    agent -- websocket --> minibridge
-    minibridge -- stdio --> mcpserver
-```
-
 In order to secure the connections, you need to enable HTTPS for incoming
 connections:
 
@@ -159,15 +145,6 @@ You can then send requests via stdin and read responses from stdout. The
 frontend maintains a single WebSocket connection to the backend and will
 automatically reconnect in case of failures.
 
-The flow will look like the following:
-
-```mermaid
-flowchart LR
-    agent -- stdio --> mb1[minibridge]
-    mb1 -- websocket --> mb2[minibridge]
-    mb2 -- stdio --> mcpserver
-```
-
 ### HTTP+SSE
 
 To start an SSE frontend:
@@ -188,15 +165,6 @@ You can connect directly using an HTTP client:
     $ curl http://127.0.0.1:8001/message?sessionId=UID \
       -X POST \
       -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
-
-The flow will look like the following:
-
-```mermaid
-flowchart LR
-    agent -- http+sse --> mb1[minibridge]
-    mb1 -- websocket --> mb2[minibridge]
-    mb2 -- stdio --> mcpserver
-```
 
 In order to secure the connections, you need to enable HTTPS for incoming
 connections:
