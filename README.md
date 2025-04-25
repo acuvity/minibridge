@@ -11,7 +11,7 @@ Rego](https://www.openpolicyagent.org/docs/latest/policy-reference/) policies.
 Minibridge can help ensure the integrity of MCP servers through
 SBOM (Software Bill of Materials) generation and real-time validation.
 
-MAdditionally, inibridge supports [OTEL](https://opentelemetry.io/) and can
+Additionally, inibridge supports [OTEL](https://opentelemetry.io/) and can
 report/rettach spans from classical OTEL headers, as well as directly from the
 MCP call, as inserted by certain tool like [Open
 Inference](https://arize-ai.github.io/openinference).
