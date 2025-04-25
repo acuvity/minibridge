@@ -346,8 +346,8 @@ go.acuvity.ai/regolithe v0.0.0-20250321141528-1fe83b60f317 h1:zNRhRowG4yQgncNdR/
 go.acuvity.ai/regolithe v0.0.0-20250321141528-1fe83b60f317/go.mod h1:hYoJkZRbNRpHKMNtNiugQDu6emXrhHP/Es5xAX35O2Y=
 go.acuvity.ai/tg v0.0.0-20250220234315-d9494083aa3a h1:oqIMPF2BTBRgjiUQCFcmulceL9MjrVnjmd0F9v9VDz0=
 go.acuvity.ai/tg v0.0.0-20250220234315-d9494083aa3a/go.mod h1:qTHlyRc0Bl98d+RcmkETNDd7JyNeRvqWzUKQqC52wQg=
-go.acuvity.ai/wsc v0.0.0-20250429021220-1b6b4c569a2f h1:ZGkNDbGsyakuFAXpgcLUsWmaMomYyKqbY61xC2ic3Ek=
-go.acuvity.ai/wsc v0.0.0-20250429021220-1b6b4c569a2f/go.mod h1:Yu1kIqo/df5DRqlPeOF3dgc+Ij8bBXjYzJX0a5ueZi8=
+go.acuvity.ai/wsc v0.0.0-20250506232542-8de7ff436ec0 h1:nlH9CIDZqAKDh7gNETUv9zPjJDR8dfBbhEZqiCDBZjI=
+go.acuvity.ai/wsc v0.0.0-20250506232542-8de7ff436ec0/go.mod h1:Yu1kIqo/df5DRqlPeOF3dgc+Ij8bBXjYzJX0a5ueZi8=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
 go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 h1:sbiXRNDSWJOTobXh5HyQKjq6wUC5tNybqjIqDpAY4CU=

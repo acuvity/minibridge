@@ -9,7 +9,7 @@ require (
 	go.acuvity.ai/manipulate v0.0.0-20250416135246-f7d22e975de4 // indirect
 	go.acuvity.ai/regolithe v0.0.0-20250321141528-1fe83b60f317 // indirect
 	go.acuvity.ai/tg v0.0.0-20250220234315-d9494083aa3a
-	go.acuvity.ai/wsc v0.0.0-20250429021220-1b6b4c569a2f
+	go.acuvity.ai/wsc v0.0.0-20250506232542-8de7ff436ec0
 )
 
 require (

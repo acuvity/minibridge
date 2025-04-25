@@ -24,8 +24,9 @@ func init() {
 	initSharedFlagSet()
 
 	fAIO.StringP("listen", "l", "", "listen address of the bridge for incoming connections. If unset, stdio is used.")
-	fAIO.String("endpoint-messages", "/message", "when using HTTP, sets the endpoint to post messages.")
-	fAIO.String("endpoint-sse", "/sse", "when using HTTP, sets the endpoint to connect to the event stream.")
+	fAIO.String("endpoint-mcp", "/mcp", "when using HTTP, sets the endpoint to send messages (proto 2025-03-26).")
+	fAIO.String("endpoint-messages", "/message", "when using HTTP, sets the endpoint to post messages (proto 2024-11-05).")
+	fAIO.String("endpoint-sse", "/sse", "when using HTTP, sets the endpoint to connect to the event stream (proto 2024-11-05).")
 
 	AIO.Flags().AddFlagSet(fAIO)
 	AIO.Flags().AddFlagSet(fPolicer)
@@ -52,6 +53,7 @@ var AIO = &cobra.Command{
 		defer cancel()
 
 		listen := viper.GetString("listen")
+		mcpEndpoint := viper.GetString("endpoint-mcp")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 
@@ -134,6 +136,7 @@ var AIO = &cobra.Command{
 			if listen != "" {
 
 				slog.Info("Minibridge frontend configured",
+					"mcp", mcpEndpoint,
 					"sse", sseEndpoint,
 					"messages", messageEndpoint,
 					"agent-token", auth != nil,
@@ -145,7 +148,8 @@ var AIO = &cobra.Command{
 
 				proxy = frontend.NewHTTP(listen, "ws://self/ws", frontendServerTLSConfig, nil,
 					frontend.OptHTTPBackendDialer(dialer),
-					frontend.OptHTTPStreamEndpoint(sseEndpoint),
+					frontend.OptHTTPMCPEndpoint(mcpEndpoint),
+					frontend.OptHTTPSSEEndpoint(sseEndpoint),
 					frontend.OptHTTPMessageEndpoint(messageEndpoint),
 					frontend.OptHTTPAgentAuth(auth),
 					frontend.OptHTTPAgentTokenPassthrough(true),

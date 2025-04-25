@@ -163,14 +163,14 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
 
-	ws, err := upgrader.Upgrade(w, req, nil)
+	upgraded, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		slog.Error("Unable to upgrade to websocket", err)
 		m(http.StatusInternalServerError)
 		return
 	}
 
-	session, err := wsc.Accept(ctx, ws, wsc.Config{
+	ws, err := wsc.Accept(ctx, upgraded, wsc.Config{
 		WriteChanSize: 64,
 		ReadChanSize:  16,
 	})
@@ -183,7 +183,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	span.End()
 	m(http.StatusSwitchingProtocols)
 
-	defer session.Close(1001)
+	defer ws.Close(1001)
 
 	rb := ringbuffer.New(4096)
 
@@ -203,11 +203,11 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		select {
 
-		case data := <-session.Read():
+		case data := <-ws.Read():
 
 			slog.Debug("Received data from websocket", "msg", string(data))
 
-			if data, err = p.handleMCPCall(ctx, cache, session, agent, data, api.CallTypeRequest); err != nil {
+			if data, err = p.handleMCPCall(ctx, cache, ws, agent, data, api.CallTypeRequest); err != nil {
 				slog.Error("Unable to handle mcp agent message", err)
 				continue
 			}
@@ -218,12 +218,12 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			slog.Debug("Received data from MCP Server", "msg", string(data))
 
-			if data, err = p.handleMCPCall(ctx, cache, session, agent, data, api.CallTypeResponse); err != nil {
+			if data, err = p.handleMCPCall(ctx, cache, ws, agent, data, api.CallTypeResponse); err != nil {
 				slog.Error("Unable to handle mcp server message", err)
 				continue
 			}
 
-			session.Write(sanitize.Data(data))
+			ws.Write(sanitize.Data(data))
 
 		case data := <-stream.Stderr:
 			_, _ = rb.Write(data)
@@ -250,11 +250,11 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 			return
 
-		case err := <-session.Error():
+		case err := <-ws.Error():
 			slog.Error("Backend websocket encountered and error", err)
 			return
 
-		case err := <-session.Done():
+		case err := <-ws.Done():
 			if err != nil && !strings.HasSuffix(err.Error(), "websocket: close 1001 (going away)") {
 				slog.Error("Backend websocket has closed", err)
 			} else {

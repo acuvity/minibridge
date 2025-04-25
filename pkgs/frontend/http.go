@@ -3,6 +3,7 @@ package frontend
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,30 +14,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"go.acuvity.ai/minibridge/pkgs/auth"
+	"go.acuvity.ai/minibridge/pkgs/frontend/internal/session"
 	"go.acuvity.ai/minibridge/pkgs/internal/cors"
 	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
-	"go.acuvity.ai/wsc"
+	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
 )
 
-type session struct {
-	id       string
-	ws       wsc.Websocket
-	credHash uint64
-	count    int
-}
-
 type httpFrontend struct {
 	backendURL      string
 	server          *http.Server
-	sessions        map[string]*session
 	listen          string
 	tlsServerConfig *tls.Config
 	tlsClientConfig *tls.Config
 	cfg             httpCfg
+	smanager        *session.Manager
 
 	sync.RWMutex
 }
@@ -53,10 +47,10 @@ func NewHTTP(addr string, backend string, serverTLSConfig *tls.Config, clientTLS
 	}
 
 	p := &httpFrontend{
+		smanager:        session.NewManager(),
 		backendURL:      backend,
 		tlsClientConfig: clientTLSConfig,
 		tlsServerConfig: serverTLSConfig,
-		sessions:        map[string]*session{},
 		listen:          addr,
 		cfg:             cfg,
 	}
@@ -125,10 +119,17 @@ func (p *httpFrontend) Start(ctx context.Context) error {
 
 // startSession register a new session, connects to the backend ws, acquires it immediately, and returns it.
 // Caller MUST release the session when you done using releaseSession.
-func (p *httpFrontend) startSession(ctx context.Context, req *http.Request) (*session, error) {
+func (p *httpFrontend) startSession(ctx context.Context, req *http.Request) (*session.Session, error) {
+
+	p.Lock()
+	defer p.Unlock()
 
 	auth, authHeader := p.getCreds(req)
 	ch := hashCreds(auth, authHeader)
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	ws, err := Connect(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, AgentInfo{
 		Auth:        auth,
@@ -140,53 +141,169 @@ func (p *httpFrontend) startSession(ctx context.Context, req *http.Request) (*se
 		return nil, fmt.Errorf("unable to register session backend: %w", err)
 	}
 
-	s := &session{
-		ws:       ws,
-		credHash: ch,
-		count:    1,
-		id:       uuid.Must(uuid.NewV6()).String(),
-	}
+	sid := fmt.Sprintf("%x", ch)
 
-	p.Lock()
-	p.sessions[s.id] = s
-	p.Unlock()
+	s := session.New(ws, ch, sid)
 
-	slog.Debug("HTTP: session reqgistered and acquired", "sid", s.id, "c", 1)
+	p.smanager.Register(s)
+
 	return s, nil
 }
 
-// acquireSession acquires and returns the session with the given sid.
-// It returns nil if not session with that sid is found.
-func (p *httpFrontend) acquireSession(sid string) *session {
+func (p *httpFrontend) handleMCP(w http.ResponseWriter, req *http.Request) {
 
-	p.Lock()
-	s := p.sessions[sid]
-	if s != nil {
-		s.count++
-		slog.Debug("HTTP: session acquired", "sid", sid, "c", s.count)
+	var err error
+
+	m := func(int) time.Duration { return 0 }
+	if p.cfg.metricsManager != nil {
+		m = p.cfg.metricsManager.MeasureRequest(req.Method, req.URL.Path)
 	}
-	p.Unlock()
 
-	return s
-}
+	ctx, span := p.cfg.tracer.Start(req.Context(), "streamable")
+	defer span.End()
 
-// releaseSession sessions releases an acquired session.
-// if the session is not acquired by anything, the ws connection
-// will be closed, and the session deleted.
-func (p *httpFrontend) releaseSession(sid string) {
-
-	p.Lock()
-	s := p.sessions[sid]
-	if s == nil {
+	if req.Method != http.MethodPost && req.Method != http.MethodGet && req.Method != http.MethodDelete {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		m(http.StatusMethodNotAllowed)
 		return
 	}
-	s.count--
-	slog.Debug("HTTP: session released", "sid", sid, "c", s.count, "deleted", s.count <= 0)
-	if s.count <= 0 {
-		s.ws.Close(1001)
-		delete(p.sessions, sid)
+
+	sid := req.Header.Get("Mcp-Session-Id")
+
+	if req.Method == http.MethodDelete {
+		slog.Info("Handling streamable session delete request", "sid", sid)
+		p.smanager.Release(sid, nil)
+		w.WriteHeader(http.StatusAccepted)
+		return
 	}
-	p.Unlock()
+
+	slog.Debug(
+		"Handling new streamable request",
+		"client", req.RemoteAddr,
+		"method", req.Method,
+		"sid", sid,
+	)
+
+	var data []byte
+	if req.Method == http.MethodPost {
+		if data, err = io.ReadAll(req.Body); err != nil {
+			http.Error(w, fmt.Sprintf("unable to read body: %s", err), http.StatusBadRequest)
+			m(http.StatusBadRequest)
+			return
+		}
+		defer func() { _ = req.Body.Close() }()
+	}
+
+	call := api.MCPCall{}
+
+	// Is this the protocol? a bug in Inspector?
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &call); err != nil {
+			http.Error(w, fmt.Sprintf("unable to decode json body: %s", err), http.StatusBadRequest)
+			m(http.StatusBadRequest)
+			return
+		}
+	}
+
+	var s *session.Session
+
+	// We now need to understand the protocol in order to transport it...
+	if call.Method == "initialize" {
+
+		if s, err = p.startSession(ctx, req); err != nil {
+			http.Error(w, fmt.Sprintf("unable to start session: %s", err), http.StatusForbidden)
+			m(http.StatusForbidden)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Mcp-Session-Id", s.ID())
+
+		sid = s.ID()
+	}
+
+	// From now on we MUST have a session ID.
+	// If it's not set we return 400, per spec.
+	if sid == "" {
+		http.Error(w, "Mcp-Session-Id must be set", http.StatusBadRequest)
+		m(http.StatusBadRequest)
+		return
+	}
+
+	// If we can't find the session, we return 404, per spec.
+	respCh := make(chan []byte, 10)
+	if s = p.smanager.Acquire(sid, respCh); s == nil {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		m(http.StatusNotFound)
+		return
+	}
+	defer p.smanager.Release(s.ID(), respCh)
+
+	span.SetAttributes(attribute.String("session", s.ID()))
+
+	// check the creds hash are identical to prevent session id reuse.
+	if !s.ValidateHash(hashCreds(p.getCreds(req))) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		m(http.StatusUnauthorized)
+		return
+	}
+
+	if req.Method == http.MethodPost {
+		s.Write(sanitize.Data(data))
+	}
+
+	// we wrote the data to the server at that point
+	// If it was a notification, or a response, we say accepted
+	// and we move on.
+	if strings.HasPrefix(call.Method, "notifications") || call.Result != nil {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	rc := http.NewResponseController(w)
+	defer func() { _ = rc.Flush() }()
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.WriteHeader(http.StatusOK)
+
+	for {
+
+		select {
+
+		case data := <-respCh:
+
+			if len(data) == 0 {
+				continue
+			}
+
+			resp := api.MCPCall{}
+			if err = json.Unmarshal(data, &resp); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				m(http.StatusInternalServerError)
+				return
+			}
+
+			if resp.IDString() != "" && resp.IDString() != call.IDString() {
+				continue
+			}
+
+			if err := writeSSEMessage(w, rc, data); err != nil {
+				slog.Error("Unable to write SSE message", "sid", s.ID(), err)
+				continue
+			}
+
+			if resp.IDString() != "" && resp.IDString() == call.IDString() {
+				return
+			}
+
+		case <-ctx.Done():
+			return
+
+		case err := <-s.Done():
+			handleSessionDone(err)
+			return
+		}
+	}
 }
 
 func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
@@ -213,9 +330,57 @@ func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 		m(http.StatusForbidden)
 		return
 	}
-	defer p.releaseSession(s.id)
 
-	p.startStream(ctx, w, req, s, true)
+	readCh := make(chan []byte, 10)
+	p.smanager.Acquire(s.ID(), readCh)
+	defer p.smanager.Release(s.ID(), readCh)
+
+	w.Header().Add("Content-Type", "text/event-stream")
+	if req.Proto == "HTTP/1.1" {
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Add("Connection", "keep-alive")
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	rc := http.NewResponseController(w)
+	defer func() { _ = rc.Flush() }()
+
+	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, s.ID()); err != nil {
+		slog.Error("Unable to send endpoint event", "sid", s.ID(), err)
+		return
+	}
+
+	if err := rc.Flush(); err != nil {
+		slog.Error("Unable to flush endpoint event", "sid", s.ID(), err)
+		return
+	}
+
+	for {
+		select {
+
+		case <-ctx.Done():
+			slog.Debug("Client is gone from stream")
+			return
+
+		case data := <-readCh:
+
+			if len(data) == 0 {
+				continue
+			}
+
+			slog.Debug("Received data from backend", "data", string(data))
+
+			if err := writeSSEMessage(w, rc, data); err != nil {
+				slog.Error("Unable to write SSE message", err)
+				continue
+			}
+
+		case err := <-s.Done():
+			handleSessionDone(err)
+			return
+		}
+	}
 }
 
 func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
@@ -247,15 +412,15 @@ func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) 
 	log := slog.With("sid", sid)
 	log.Debug("Handling messages", "accept", accepts)
 
-	session := p.acquireSession(sid)
-	if session == nil {
+	s := p.smanager.Acquire(sid, nil)
+	if s == nil {
 		http.Error(w, "Session not found", http.StatusForbidden)
 		m(http.StatusForbidden)
 		return
 	}
-	defer p.releaseSession(sid)
+	defer p.smanager.Release(sid, nil)
 
-	if hashCreds(p.getCreds(req)) != session.credHash {
+	if !s.ValidateHash(hashCreds(p.getCreds(req))) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		m(http.StatusUnauthorized)
 		return
@@ -280,72 +445,7 @@ func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) 
 
 	defer m(http.StatusAccepted)
 
-	session.ws.Write(sanitize.Data(data))
-}
-
-func (p *httpFrontend) startStream(ctx context.Context, w http.ResponseWriter, req *http.Request, s *session, backwardCompat bool) {
-
-	log := slog.With("sid", s.id)
-
-	w.Header().Add("Content-Type", "text/event-stream")
-	if req.Proto == "HTTP/1.1" {
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Add("Connection", "keep-alive")
-	}
-
-	w.WriteHeader(http.StatusOK)
-
-	rc := http.NewResponseController(w)
-
-	if backwardCompat {
-		if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, s.id); err != nil {
-			log.Error("Unable to send endpoint event", err)
-			return
-		}
-
-		if err := rc.Flush(); err != nil {
-			log.Error("Unable to flush endpoint event", err)
-			return
-		}
-	}
-
-	defer func() { _ = rc.Flush() }()
-
-	for {
-
-		select {
-
-		case <-ctx.Done():
-			log.Debug("Client is gone from stream")
-			return
-
-		case data := <-s.ws.Read():
-
-			if len(data) == 0 {
-				continue
-			}
-
-			log.Debug("Received data from backend", "data", string(data))
-
-			if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", string(sanitize.Data(data))); err != nil {
-				log.Error("Unable to write event", err)
-				continue
-			}
-
-			if err := rc.Flush(); err != nil {
-				log.Error("Unable to flush remote event", err)
-				continue
-			}
-
-		case err := <-s.ws.Done():
-			if err != nil && !strings.HasSuffix(err.Error(), "websocket: close 1001 (going away)") {
-				log.Error("Client websocket has closed", err)
-			} else {
-				log.Debug("Client websocket has closed")
-			}
-			return
-		}
-	}
+	s.Write(sanitize.Data(data))
 }
 
 // ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
@@ -357,6 +457,9 @@ func (p *httpFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	switch req.URL.Path {
+
+	case p.cfg.mcpEndpoint:
+		p.handleMCP(w, req)
 
 	case p.cfg.sseEndpoint:
 		p.handleSSE(w, req)
@@ -380,4 +483,31 @@ func (p *httpFrontend) getCreds(req *http.Request) (auth *auth.Auth, authHeaders
 	}
 
 	return nil, nil
+}
+
+func writeSSEMessage(w http.ResponseWriter, rc *http.ResponseController, data []byte) error {
+
+	if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", string(sanitize.Data(data))); err != nil {
+		return fmt.Errorf("unable to write event: %w", err)
+	}
+
+	if err := rc.Flush(); err != nil {
+		return fmt.Errorf("unable to flush remote event: %w", err)
+	}
+
+	return nil
+}
+
+func handleSessionDone(err error) {
+
+	if err == nil {
+		return
+	}
+
+	if !strings.HasSuffix(err.Error(), "websocket: close 1001 (going away)") {
+		slog.Error("Client websocket has closed", err)
+		return
+	}
+
+	slog.Debug("Client websocket has closed")
 }
