@@ -43,7 +43,7 @@ reasons contains msg if {
 	input.mcp.method == "tools/call"
 	claims.email == "bob@example.com"
 	input.mcp.params.name == "longRunningOperation"
-	msg := "only alice can run printEnv"
+	msg := "bob cannot run longRunningOperation"
 }
 
 # if the call is a tools/call and the request is from Bob, we remove the
