@@ -212,68 +212,7 @@ func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 	}
 	defer p.releaseSession(s.id)
 
-	log := slog.With("sid", s.id)
-	span.SetAttributes(attribute.String("session", s.id))
-
-	w.Header().Add("Content-Type", "text/event-stream")
-	if req.Proto == "HTTP/1.1" {
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Add("Connection", "keep-alive")
-	}
-
-	w.WriteHeader(http.StatusOK)
-	span.End()
-
-	rc := http.NewResponseController(w)
-
-	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, s.id); err != nil {
-		slog.Error("Unable to send endpoint event", err)
-		m(http.StatusInternalServerError)
-		return
-	}
-
-	if err := rc.Flush(); err != nil {
-		log.Error("Unable to flush endpoint event", err)
-		m(http.StatusInternalServerError)
-		return
-	}
-
-	defer func() {
-		_ = rc.Flush()
-		m(http.StatusOK)
-	}()
-
-	for {
-
-		select {
-
-		case <-ctx.Done():
-			log.Debug("Client is gone from /sse")
-			return
-
-		case buf := <-s.ws.Read():
-
-			if len(buf) == 0 {
-				continue
-			}
-
-			log.Debug("Received data from backend", "data", string(buf))
-
-			if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", string(data.Sanitize(buf))); err != nil {
-				log.Error("Unable to write event", err)
-				continue
-			}
-
-			if err := rc.Flush(); err != nil {
-				log.Error("Unable to flush remote event", err)
-				continue
-			}
-
-		case <-s.ws.Done():
-			log.Debug("Backend websocket is gone")
-			return
-		}
-	}
+	p.startStream(ctx, w, req, s, true)
 }
 
 func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
@@ -339,6 +278,67 @@ func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) 
 	defer m(http.StatusAccepted)
 
 	session.ws.Write(data.Sanitize(buf))
+}
+
+func (p *httpFrontend) startStream(ctx context.Context, w http.ResponseWriter, req *http.Request, s *session, backwardCompat bool) {
+
+	log := slog.With("sid", s.id)
+
+	w.Header().Add("Content-Type", "text/event-stream")
+	if req.Proto == "HTTP/1.1" {
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Add("Connection", "keep-alive")
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	rc := http.NewResponseController(w)
+
+	if backwardCompat {
+		if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, s.id); err != nil {
+			log.Error("Unable to send endpoint event", err)
+			return
+		}
+
+		if err := rc.Flush(); err != nil {
+			log.Error("Unable to flush endpoint event", err)
+			return
+		}
+	}
+
+	defer func() { _ = rc.Flush() }()
+
+	for {
+
+		select {
+
+		case <-ctx.Done():
+			log.Debug("Client is gone from stream")
+			return
+
+		case buf := <-s.ws.Read():
+
+			if len(buf) == 0 {
+				continue
+			}
+
+			log.Debug("Received data from backend", "data", string(buf))
+
+			if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", string(data.Sanitize(buf))); err != nil {
+				log.Error("Unable to write event", err)
+				continue
+			}
+
+			if err := rc.Flush(); err != nil {
+				log.Error("Unable to flush remote event", err)
+				continue
+			}
+
+		case <-s.ws.Done():
+			log.Debug("Backend websocket is gone")
+			return
+		}
+	}
 }
 
 // ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
