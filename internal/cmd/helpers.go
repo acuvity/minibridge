@@ -31,23 +31,18 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 
 	var hasTLS bool
 
-	skipVerify := viper.GetBool("tls-client-insecure-skip-verify")
-
-	if skipVerify {
-		slog.Warn("Certificate validation deactivated. Connection will not be secure")
-		hasTLS = true
-	}
-
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: skipVerify, // #nosec: G402
+		MinVersion: tls.VersionTLS12,
 	}
 
 	var certPath, keyPath, keyPass string
+	var skipVerify bool
 
 	if flags.Name() == "tlsclient" {
 		certPath = viper.GetString("tls-client-cert")
 		keyPath = viper.GetString("tls-client-key")
 		keyPass = viper.GetString("tls-client-key-pass")
+		skipVerify = viper.GetBool("tls-client-insecure-skip-verify")
 	}
 	serverCAPath := viper.GetString("tls-client-backend-ca")
 
@@ -57,6 +52,12 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 		keyPass = viper.GetString("tls-server-key-pass")
 	}
 	clientCAPath := viper.GetString("tls-server-client-ca")
+
+	if skipVerify {
+		slog.Warn("Backend certificates validation deactivated. Connection will not be secure")
+		tlsConfig.InsecureSkipVerify = true
+		hasTLS = true
+	}
 
 	if certPath != "" && keyPath != "" {
 		x509Cert, x509Key, err := tglib.ReadCertificatePEM(certPath, keyPath, keyPass)
