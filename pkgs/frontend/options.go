@@ -1,6 +1,9 @@
 package frontend
 
 import (
+	"context"
+	"net"
+
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.opentelemetry.io/otel/trace"
@@ -15,6 +18,7 @@ type sseCfg struct {
 	corsPolicy            *bahamut.CORSPolicy
 	metricsManager        *metrics.Manager
 	tracer                trace.Tracer
+	backendDialer         func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
 func newSSECfg() sseCfg {
@@ -89,10 +93,18 @@ func OptSSETracer(tracer trace.Tracer) OptSSE {
 	}
 }
 
+// OptSSEBackendDialer sets the dialer to use to connect to the backend.
+func OptSSEBackendDialer(dialer func(ctx context.Context, network, addr string) (net.Conn, error)) OptSSE {
+	return func(cfg *sseCfg) {
+		cfg.backendDialer = dialer
+	}
+}
+
 type stdioCfg struct {
-	retry      bool
-	agentToken string
-	tracer     trace.Tracer
+	retry         bool
+	agentToken    string
+	tracer        trace.Tracer
+	backendDialer func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
 func newStdioCfg() stdioCfg {
@@ -128,5 +140,12 @@ func OptStdioTracer(tracer trace.Tracer) OptStdio {
 			tracer = noop.NewTracerProvider().Tracer("noop")
 		}
 		cfg.tracer = tracer
+	}
+}
+
+// OptStdioBackendDialer sets the dialer to use to connect to the backend.
+func OptStdioBackendDialer(dialer func(ctx context.Context, network, addr string) (net.Conn, error)) OptStdio {
+	return func(cfg *stdioCfg) {
+		cfg.backendDialer = dialer
 	}
 }

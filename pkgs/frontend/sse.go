@@ -26,11 +26,11 @@ type session struct {
 }
 
 type sseFrontend struct {
-	backendURL string
-	server     *http.Server
-	sessions   map[string]session
-	tlsConfig  *tls.Config
-	cfg        sseCfg
+	backendURL      string
+	server          *http.Server
+	sessions        map[string]session
+	tlsClientConfig *tls.Config
+	cfg             sseCfg
 
 	sync.RWMutex
 }
@@ -47,10 +47,10 @@ func NewSSE(addr string, backend string, serverTLSConfig *tls.Config, clientTLSC
 	}
 
 	p := &sseFrontend{
-		backendURL: backend,
-		tlsConfig:  clientTLSConfig,
-		sessions:   map[string]session{},
-		cfg:        cfg,
+		backendURL:      backend,
+		tlsClientConfig: clientTLSConfig,
+		sessions:        map[string]session{},
+		cfg:             cfg,
 	}
 
 	p.server = &http.Server{
@@ -167,7 +167,7 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	wsToken, wsAuthHeaders := p.getCreds(req)
 
-	ws, err := connectWS(ctx, p.backendURL, p.tlsConfig, agentInfo{
+	ws, err := connectWS(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, agentInfo{
 		token:       wsToken,
 		authHeaders: wsAuthHeaders,
 		remoteAddr:  req.RemoteAddr,

@@ -35,12 +35,14 @@ type wsBackend struct {
 	cfg       wsCfg
 	mcpServer client.MCPServer
 	server    *http.Server
+	listen    string
+	tlsConfig *tls.Config
 }
 
 // NewWebSocket retrurns a new backend.Backend exposing a Websocket to communicate
 // with the given mcp.Server. It will use the given *tls.Config for everything TLS.
 // It tls.Config is nil, the server will run as plain HTTP.
-func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServer, opts ...OptWS) Backend {
+func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServer, opts ...Option) Backend {
 
 	cfg := newWSCfg()
 	for _, o := range opts {
@@ -50,11 +52,11 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServ
 	p := &wsBackend{
 		mcpServer: mcpServer,
 		cfg:       cfg,
+		listen:    listen,
+		tlsConfig: tlsConfig,
 	}
 
 	p.server = &http.Server{
-		TLSConfig:         tlsConfig,
-		Addr:              listen,
 		Handler:           otelhttp.NewHandler(http.HandlerFunc(p.ServeHTTP), "backend"),
 		ReadHeaderTimeout: time.Second,
 	}
@@ -64,7 +66,7 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServ
 
 // Start starts the server and will block until the given
 // context is canceled.
-func (p *wsBackend) Start(ctx context.Context) error {
+func (p *wsBackend) Start(ctx context.Context) (err error) {
 
 	errCh := make(chan error, 1)
 
@@ -85,24 +87,24 @@ func (p *wsBackend) Start(ctx context.Context) error {
 		}
 	}
 
-	go func() {
-		if p.server.TLSConfig == nil {
-			err := p.server.ListenAndServe()
-			if err != nil {
-				if !errors.Is(err, http.ErrServerClosed) {
-					slog.Error("unable to start server", "err", err)
-				}
-			}
-			errCh <- err
-		} else {
-			err := p.server.ListenAndServeTLS("", "")
-			if err != nil {
-				if !errors.Is(err, http.ErrServerClosed) {
-					slog.Error("unable to start tls server", "err", err)
-				}
-			}
-			errCh <- err
+	listener := p.cfg.listener
+	if listener == nil {
+		if listener, err = net.Listen("tcp", p.listen); err != nil {
+			return fmt.Errorf("unable to start listener: %w", err)
 		}
+	}
+	if p.tlsConfig != nil {
+		listener = tls.NewListener(listener, p.tlsConfig)
+	}
+
+	go func() {
+		err := p.server.Serve(listener)
+		if err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("unable to start server", "err", err)
+			}
+		}
+		errCh <- err
 	}()
 
 	select {

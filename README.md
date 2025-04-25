@@ -498,9 +498,9 @@ OTEL [standard env variables](https://opentelemetry.io/docs/specs/otel/configura
 
 Minibridge is still missing the following features:
 
+- [ ] Unit tests (started)
 - [x] Transport user information over the websocket channel
 - [x] Support for user extraction to pass to the policer
 - [x] Plug in prometheus metrics
 - [x] Opentelemetry
-- [ ] Unit tests (started)
-- [ ] Optimize communications between front/back in aio mode
+- [x] Optimize communications between front/back in aio mode (use memconn)

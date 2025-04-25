@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"strings"
 
 	"go.acuvity.ai/wsc"
 	"go.opentelemetry.io/otel"
@@ -21,23 +23,31 @@ type agentInfo struct {
 	remoteAddr  string
 }
 
-func connectWS(ctx context.Context, backendURL string, tlsConfig *tls.Config, info agentInfo) (wsc.Websocket, error) {
+func connectWS(
+	ctx context.Context,
+	dialer func(ctx context.Context, network, addr string) (net.Conn, error),
+	backendURL string,
+	tlsConfig *tls.Config,
+	info agentInfo,
+) (wsc.Websocket, error) {
 
 	slog.Debug("New websocket connection",
 		"url", backendURL,
 		"using-token", info.token != "",
 		"using-headers", len(info.authHeaders) > 0,
-		"tls", tlsConfig != nil,
+		"tls", strings.HasPrefix(backendURL, "wss://"),
+		"tls-config", tlsConfig != nil,
 	)
 
-	if (info.token != "" || len(info.authHeaders) > 0) && tlsConfig == nil {
+	if dialer == nil && (info.token != "" || len(info.authHeaders) > 0) && tlsConfig == nil {
 		slog.Warn("Security: connecting to a websocket with crendentials sent over the network in clear-text. Refused. Credentials have been stripped. Request will proceed and will likely fail.")
 	}
 
 	wsconfig := wsc.Config{
-		WriteChanSize: 64,
-		ReadChanSize:  16,
-		TLSConfig:     tlsConfig,
+		WriteChanSize:      64,
+		ReadChanSize:       16,
+		TLSConfig:          tlsConfig,
+		NetDialContextFunc: dialer,
 	}
 
 	wsconfig.Headers = http.Header{
@@ -47,7 +57,7 @@ func connectWS(ctx context.Context, backendURL string, tlsConfig *tls.Config, in
 
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(wsconfig.Headers))
 
-	if tlsConfig != nil {
+	if tlsConfig != nil || dialer != nil {
 		if info.token != "" {
 			wsconfig.Headers["Authorization"] = []string{"Basic " + base64.StdEncoding.EncodeToString(fmt.Appendf([]byte{}, "Bearer:%s", info.token))}
 		} else if len(info.authHeaders) > 0 {

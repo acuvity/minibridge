@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"crypto/tls"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -76,5 +77,12 @@ func TestThing(t *testing.T) {
 		cfg := newWSCfg()
 		OptTracer(nil)(&cfg)
 		So(cfg.tracer, ShouldHaveSameTypeAs, noop.NewTracerProvider().Tracer("test"))
+	})
+
+	Convey("OptListener should work", t, func() {
+		cfg := newWSCfg()
+		listener := tls.NewListener(nil, nil)
+		OptListener(listener)(&cfg)
+		So(cfg.listener, ShouldEqual, listener)
 	})
 }

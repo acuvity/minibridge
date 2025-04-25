@@ -2,22 +2,18 @@ package cmd
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
 	"log/slog"
 	"net"
 	"time"
 
+	"github.com/akutz/memconn"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.acuvity.ai/minibridge/pkgs/backend"
 	"go.acuvity.ai/minibridge/pkgs/client"
 	"go.acuvity.ai/minibridge/pkgs/frontend"
-	"go.acuvity.ai/tg/tglib"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -66,27 +62,10 @@ var AIO = &cobra.Command{
 			)
 		}
 
-		backendTLSConfig, trustPool, err := makeTempTLSConfig()
-		if err != nil {
-			return err
-		}
-
 		policer, err := makePolicer()
 		if err != nil {
 			return fmt.Errorf("unable to make policer: %w", err)
 		}
-
-		frontendClientTLSConfig, err := tlsConfigFromFlags(fTLSClient)
-		if err != nil {
-			return err
-		}
-		if frontendClientTLSConfig == nil {
-			frontendClientTLSConfig = &tls.Config{
-				MinVersion: tls.VersionTLS12,
-			}
-		}
-
-		frontendClientTLSConfig.RootCAs = trustPool
 
 		sbom, err := makeSBOM()
 		if err != nil {
@@ -104,13 +83,6 @@ var AIO = &cobra.Command{
 
 		mm := startHealthServer(ctx)
 
-		iport, err := randomFreePort()
-		if err != nil {
-			return fmt.Errorf("unable to find local free port")
-		}
-		backendURL := fmt.Sprintf("wss://127.0.0.1:%d/ws", iport)
-		slog.Debug("Found internal free port", "port", iport)
-
 		var eg errgroup.Group
 
 		eg.Go(func() error {
@@ -119,7 +91,7 @@ var AIO = &cobra.Command{
 
 			mcpServer, err := client.NewMCPServer(args[0], args[1:]...)
 			if err != nil {
-				return err
+				return fmt.Errorf("unable to create mcp server: %w", err)
 			}
 
 			slog.Info("MCP server configured",
@@ -129,7 +101,13 @@ var AIO = &cobra.Command{
 
 			slog.Info("Minibridge backend configured")
 
-			proxy := backend.NewWebSocket(fmt.Sprintf("127.0.0.1:%d", iport), backendTLSConfig, mcpServer,
+			listener, err := memconn.Listen("memu", "self")
+			if err != nil {
+				return fmt.Errorf("unable to start memory listener: %w", err)
+			}
+
+			proxy := backend.NewWebSocket("self", nil, mcpServer,
+				backend.OptListener(listener),
 				backend.OptPolicer(policer),
 				backend.OptDumpStderrOnError(viper.GetString("log-format") != "json"),
 				backend.OptSBOM(sbom),
@@ -152,6 +130,10 @@ var AIO = &cobra.Command{
 				return err
 			}
 
+			dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return memconn.DialContext(cmd.Context(), "memu", "self")
+			}
+
 			if listen != "" {
 
 				slog.Info("Minibridge frontend configured",
@@ -161,11 +143,11 @@ var AIO = &cobra.Command{
 					"mode", "sse",
 					"server-tls", frontendServerTLSConfig != nil,
 					"server-mtls", mtlsMode(frontendServerTLSConfig),
-					"client-tls", frontendClientTLSConfig != nil,
 					"listen", listen,
 				)
 
-				proxy = frontend.NewSSE(listen, backendURL, frontendServerTLSConfig, frontendClientTLSConfig,
+				proxy = frontend.NewSSE(listen, "ws://self/ws", frontendServerTLSConfig, nil,
+					frontend.OptSSEBackendDialer(dialer),
 					frontend.OptSSEStreamEndpoint(sseEndpoint),
 					frontend.OptSSEMessageEndpoint(messageEndpoint),
 					frontend.OptSSEAgentToken(agentToken),
@@ -180,7 +162,8 @@ var AIO = &cobra.Command{
 					"mode", "stdio",
 				)
 
-				proxy = frontend.NewStdio(backendURL, frontendClientTLSConfig,
+				proxy = frontend.NewStdio("ws://self/ws", nil,
+					frontend.OptStdioBackendDialer(dialer),
 					frontend.OptStdioRetry(false),
 					frontend.OptStioAgentToken(agentToken),
 					frontend.OptStdioTracer(tracer),
@@ -193,55 +176,4 @@ var AIO = &cobra.Command{
 
 		return eg.Wait()
 	},
-}
-
-func makeTempTLSConfig() (*tls.Config, *x509.CertPool, error) {
-
-	cert, key, err := tglib.Issue(
-		pkix.Name{},
-		tglib.OptIssueIPSANs(net.IP{127, 0, 0, 1}),
-		tglib.OptIssueTypeServerAuth(),
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to generate internal certificate")
-	}
-
-	x509ServerKey, err := tglib.PEMToKey(key)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to parse server key pem: %w", err)
-	}
-	x509ServerCert, err := tglib.ParseCertificate(pem.EncodeToMemory(cert))
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to parse server cert: %w", err)
-	}
-
-	tlsServerCert, err := tglib.ToTLSCertificate(x509ServerCert, x509ServerKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to convert server cert to tls cert: %w", err)
-	}
-
-	pool := x509.NewCertPool()
-	pool.AddCert(x509ServerCert)
-
-	return &tls.Config{
-		Certificates: []tls.Certificate{tlsServerCert},
-		MinVersion:   tls.VersionTLS13,
-	}, pool, nil
-}
-
-func randomFreePort() (int, error) {
-
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-	if err != nil {
-		return 0, err
-	}
-
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return 0, err
-	}
-
-	defer func() { _ = l.Close() }()
-
-	return l.Addr().(*net.TCPAddr).Port, nil
 }
