@@ -21,7 +21,7 @@ func TestMCPServer(t *testing.T) {
 	Convey("calling NewMCPServer on non exiting bin should work", t, func() {
 		_, err := NewMCPServer("not-echo", "hello")
 		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldEqual, `unable to create mcp server: exec: "not-echo": executable file not found in $PATH`)
+		So(err.Error(), ShouldEqual, `unable to find server binary: exec: "not-echo": executable file not found in $PATH`)
 	})
 }
 

@@ -22,7 +22,7 @@ type MCPServer struct {
 func NewMCPServer(path string, args ...string) (MCPServer, error) {
 	p, err := exec.LookPath(path)
 	if err != nil {
-		return MCPServer{}, fmt.Errorf("unable to create mcp server: %w", err)
+		return MCPServer{}, fmt.Errorf("unable to find server binary: %w", err)
 	}
 	return MCPServer{
 		Command: p,

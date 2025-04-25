@@ -71,7 +71,7 @@ func connectWS(ctx context.Context, backendURL string, tlsConfig *tls.Config, in
 			status = resp.Status
 		}
 
-		slog.Debug("WS connection failed", "code", code, "status", status, "data", string(data))
+		slog.Error("WS connection failed", "code", code, "status", status, "data", strings.TrimSpace(string(data)), err)
 
 		return nil, fmt.Errorf("unable to connect to the websocket. code: %d, status: %s: %w", code, status, err)
 	}

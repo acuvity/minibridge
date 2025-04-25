@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -50,6 +51,12 @@ var Frontend = &cobra.Command{
 
 		if backendURL == "" {
 			return fmt.Errorf("--backend must be set")
+		}
+		if !strings.HasPrefix(backendURL, "wss://") && !strings.HasPrefix(backendURL, "ws://") {
+			return fmt.Errorf("--backend must use wss:// or ws:// scheme")
+		}
+		if !strings.HasSuffix(backendURL, "/ws") {
+			backendURL = backendURL + "/ws"
 		}
 
 		if agentToken != "" || agentTokenPassthrough {
