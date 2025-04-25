@@ -21,14 +21,16 @@ import (
 )
 
 type session struct {
+	id       string
 	ws       wsc.Websocket
 	credHash uint64
+	count    int
 }
 
 type httpFrontend struct {
 	backendURL      string
 	server          *http.Server
-	sessions        map[string]session
+	sessions        map[string]*session
 	tlsClientConfig *tls.Config
 	cfg             httpCfg
 
@@ -49,7 +51,7 @@ func NewHTTP(addr string, backend string, serverTLSConfig *tls.Config, clientTLS
 	p := &httpFrontend{
 		backendURL:      backend,
 		tlsClientConfig: clientTLSConfig,
-		sessions:        map[string]session{},
+		sessions:        map[string]*session{},
 		cfg:             cfg,
 	}
 
@@ -118,28 +120,70 @@ func (p *httpFrontend) Start(ctx context.Context) error {
 	return p.server.Shutdown(stopCtx)
 }
 
-func (p *httpFrontend) registerSession(sid string, ws wsc.Websocket, credsHash uint64) {
-	p.Lock()
-	p.sessions[sid] = session{
+// startSession register a new session, connects to the backend ws, acquires it immediately, and returns it.
+// Caller MUST release the session when you done using releaseSession.
+func (p *httpFrontend) startSession(ctx context.Context, req *http.Request) (*session, error) {
+
+	token, authHeader := p.getCreds(req)
+	ch := hashCreds(token, authHeader)
+
+	ws, err := connectWS(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, agentInfo{
+		token:       token,
+		authHeaders: authHeader,
+		remoteAddr:  req.RemoteAddr,
+		userAgent:   req.UserAgent(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to register session backend: %w", err)
+	}
+
+	s := &session{
 		ws:       ws,
-		credHash: credsHash,
+		credHash: ch,
+		count:    1,
+		id:       uuid.Must(uuid.NewV6()).String(),
+	}
+
+	p.Lock()
+	p.sessions[s.id] = s
+	p.Unlock()
+
+	slog.Debug("HTTP: session reqgistered and acquired", "sid", s.id, "c", 1)
+	return s, nil
+}
+
+// acquireSession acquires and returns the session with the given sid.
+// It returns nil if not session with that sid is found.
+func (p *httpFrontend) acquireSession(sid string) *session {
+
+	p.Lock()
+	s := p.sessions[sid]
+	if s != nil {
+		s.count++
+		slog.Debug("HTTP: session acquired", "sid", sid, "c", s.count)
 	}
 	p.Unlock()
+
+	return s
 }
 
-func (p *httpFrontend) unregisterSession(sid string) {
+// releaseSession sessions releases an acquired session.
+// if the session is not acquired by anything, the ws connection
+// will be closed, and the session deleted.
+func (p *httpFrontend) releaseSession(sid string) {
+
 	p.Lock()
-	delete(p.sessions, sid)
+	s := p.sessions[sid]
+	if s == nil {
+		return
+	}
+	s.count--
+	slog.Debug("HTTP: session released", "sid", sid, "c", s.count, "deleted", s.count <= 0)
+	if s.count <= 0 {
+		s.ws.Close(1001)
+		delete(p.sessions, sid)
+	}
 	p.Unlock()
-}
-
-func (p *httpFrontend) getSession(sid string) session {
-
-	p.RLock()
-	ws := p.sessions[sid]
-	p.RUnlock()
-
-	return ws
 }
 
 func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
@@ -158,31 +202,18 @@ func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	sid := uuid.Must(uuid.NewV6()).String()
-	span.SetAttributes(attribute.String("session", sid))
+	slog.Debug("Handling new SSE", "client", req.RemoteAddr)
 
-	log := slog.With("sid", sid)
-
-	log.Debug("Handling new SSE", "client", req.RemoteAddr)
-
-	wsToken, wsAuthHeaders := p.getCreds(req)
-
-	ws, err := connectWS(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, agentInfo{
-		token:       wsToken,
-		authHeaders: wsAuthHeaders,
-		remoteAddr:  req.RemoteAddr,
-		userAgent:   req.UserAgent(),
-	})
+	s, err := p.startSession(ctx, req)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Unable to connect to minibridge end: %s", err), http.StatusInternalServerError)
-		m(http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Unable to connect to minibridge end: %s", err), http.StatusForbidden)
+		m(http.StatusForbidden)
 		return
 	}
+	defer p.releaseSession(s.id)
 
-	defer ws.Close(1000)
-
-	p.registerSession(sid, ws, hashCreds(wsToken, wsAuthHeaders))
-	defer p.unregisterSession(sid)
+	log := slog.With("sid", s.id)
+	span.SetAttributes(attribute.String("session", s.id))
 
 	w.Header().Add("Content-Type", "text/event-stream")
 	if req.Proto == "HTTP/1.1" {
@@ -195,8 +226,8 @@ func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	rc := http.NewResponseController(w)
 
-	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, sid); err != nil {
-		log.Error("Unable to send endpoint event", err)
+	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, s.id); err != nil {
+		slog.Error("Unable to send endpoint event", err)
 		m(http.StatusInternalServerError)
 		return
 	}
@@ -220,7 +251,7 @@ func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 			log.Debug("Client is gone from /sse")
 			return
 
-		case buf := <-ws.Read():
+		case buf := <-s.ws.Read():
 
 			if len(buf) == 0 {
 				continue
@@ -238,7 +269,7 @@ func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 				continue
 			}
 
-		case <-ws.Done():
+		case <-s.ws.Done():
 			log.Debug("Backend websocket is gone")
 			return
 		}
@@ -274,16 +305,15 @@ func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) 
 	log := slog.With("sid", sid)
 	log.Debug("Handling messages", "accept", accepts)
 
-	session := p.getSession(sid)
-	if session.ws == nil {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		m(http.StatusNotFound)
+	session := p.acquireSession(sid)
+	if session == nil {
+		http.Error(w, "Session not found", http.StatusForbidden)
+		m(http.StatusForbidden)
 		return
 	}
+	defer p.releaseSession(sid)
 
-	wsToken, wsAuthHeaders := p.getCreds(req)
-
-	if hashCreds(wsToken, wsAuthHeaders) != session.credHash {
+	if hashCreds(p.getCreds(req)) != session.credHash {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		m(http.StatusUnauthorized)
 		return
