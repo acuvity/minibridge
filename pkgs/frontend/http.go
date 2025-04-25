@@ -25,28 +25,28 @@ type session struct {
 	credHash uint64
 }
 
-type sseFrontend struct {
+type httpFrontend struct {
 	backendURL      string
 	server          *http.Server
 	sessions        map[string]session
 	tlsClientConfig *tls.Config
-	cfg             sseCfg
+	cfg             httpCfg
 
 	sync.RWMutex
 }
 
-// NewSSE returns a new frontend.Frontend that will listen to the given addr
+// NewHTTP returns a new frontend.Frontend that will listen to the given addr
 // and will connect to the given minibridge backend using the given options.
 // For every new connection to the /sse endpoint, a new websocket connection will
 // be initiated to the backend, thus keeping track of the session.
-func NewSSE(addr string, backend string, serverTLSConfig *tls.Config, clientTLSConfig *tls.Config, opts ...OptSSE) Frontend {
+func NewHTTP(addr string, backend string, serverTLSConfig *tls.Config, clientTLSConfig *tls.Config, opts ...OptHTTP) Frontend {
 
-	cfg := newSSECfg()
+	cfg := newHTTPCfg()
 	for _, o := range opts {
 		o(&cfg)
 	}
 
-	p := &sseFrontend{
+	p := &httpFrontend{
 		backendURL:      backend,
 		tlsClientConfig: clientTLSConfig,
 		sessions:        map[string]session{},
@@ -65,7 +65,7 @@ func NewSSE(addr string, backend string, serverTLSConfig *tls.Config, clientTLSC
 
 // Start starts the frontend. It will block until the given context cancels or
 // until the server returns an error.
-func (p *sseFrontend) Start(ctx context.Context) error {
+func (p *httpFrontend) Start(ctx context.Context) error {
 
 	errCh := make(chan error, 1)
 
@@ -118,7 +118,7 @@ func (p *sseFrontend) Start(ctx context.Context) error {
 	return p.server.Shutdown(stopCtx)
 }
 
-func (p *sseFrontend) registerSession(sid string, ws wsc.Websocket, credsHash uint64) {
+func (p *httpFrontend) registerSession(sid string, ws wsc.Websocket, credsHash uint64) {
 	p.Lock()
 	p.sessions[sid] = session{
 		ws:       ws,
@@ -127,13 +127,13 @@ func (p *sseFrontend) registerSession(sid string, ws wsc.Websocket, credsHash ui
 	p.Unlock()
 }
 
-func (p *sseFrontend) unregisterSession(sid string) {
+func (p *httpFrontend) unregisterSession(sid string) {
 	p.Lock()
 	delete(p.sessions, sid)
 	p.Unlock()
 }
 
-func (p *sseFrontend) getSession(sid string) session {
+func (p *httpFrontend) getSession(sid string) session {
 
 	p.RLock()
 	ws := p.sessions[sid]
@@ -142,7 +142,7 @@ func (p *sseFrontend) getSession(sid string) session {
 	return ws
 }
 
-func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
+func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	m := func(int) time.Duration { return 0 }
 	if mm := p.cfg.metricsManager; mm != nil {
@@ -245,7 +245,7 @@ func (p *sseFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
+func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 
 	m := func(int) time.Duration { return 0 }
 	if p.cfg.metricsManager != nil {
@@ -313,7 +313,7 @@ func (p *sseFrontend) handleMessages(w http.ResponseWriter, req *http.Request) {
 
 // ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
 // you can use this function directly into your own *http.Server.
-func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (p *httpFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if !cors.HandleCORS(w, req, p.cfg.corsPolicy) {
 		return
@@ -332,7 +332,7 @@ func (p *sseFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (p *sseFrontend) getCreds(req *http.Request) (token string, authHeaders []string) {
+func (p *httpFrontend) getCreds(req *http.Request) (token string, authHeaders []string) {
 
 	if p.cfg.agentTokenPassthrough {
 		authHeaders = req.Header["Authorization"]

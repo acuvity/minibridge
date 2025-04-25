@@ -10,7 +10,7 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
-type sseCfg struct {
+type httpCfg struct {
 	sseEndpoint           string
 	messagesEndpoint      string
 	agentTokenPassthrough bool
@@ -21,71 +21,71 @@ type sseCfg struct {
 	backendDialer         func(ctx context.Context, network, addr string) (net.Conn, error)
 }
 
-func newSSECfg() sseCfg {
-	return sseCfg{
+func newHTTPCfg() httpCfg {
+	return httpCfg{
 		sseEndpoint:      "/sse",
 		messagesEndpoint: "/message",
 		tracer:           noop.NewTracerProvider().Tracer("noop"),
 	}
 }
 
-// OptSSE are options that can be given to NewSSE().
-type OptSSE func(*sseCfg)
+// OptHTTP are options that can be given to NewSSE().
+type OptHTTP func(*httpCfg)
 
-// OptSSEStreamEndpoint sets the sse endpoint
+// OptHTTPStreamEndpoint sets the sse endpoint
 // where agents can connect to the response stream.
 // Defaults to /sse
-func OptSSEStreamEndpoint(ep string) OptSSE {
-	return func(cfg *sseCfg) {
+func OptHTTPStreamEndpoint(ep string) OptHTTP {
+	return func(cfg *httpCfg) {
 		cfg.sseEndpoint = ep
 	}
 }
 
-// OptSSECORSPolicy sets the bahamut.CORSPolicy to use for
+// OptHTTPCORSPolicy sets the bahamut.CORSPolicy to use for
 // connection originating from a webrowser.
-func OptSSECORSPolicy(policy *bahamut.CORSPolicy) OptSSE {
-	return func(cfg *sseCfg) {
+func OptHTTPCORSPolicy(policy *bahamut.CORSPolicy) OptHTTP {
+	return func(cfg *httpCfg) {
 		cfg.corsPolicy = policy
 	}
 }
 
-// OptSSEMessageEndpoint sets the message endpoint
+// OptHTTPMessageEndpoint sets the message endpoint
 // where agents can post request.
 // Defaults to /messages
-func OptSSEMessageEndpoint(ep string) OptSSE {
-	return func(cfg *sseCfg) {
+func OptHTTPMessageEndpoint(ep string) OptHTTP {
+	return func(cfg *httpCfg) {
 		cfg.messagesEndpoint = ep
 	}
 }
 
-// OptSSEAgentToken sets the token to send to the minibridge
+// OptHTTPAgentToken sets the token to send to the minibridge
 // backend in order to authenticate the agent sending a request though
 // the minibridge frontend.
-func OptSSEAgentToken(tokenString string) OptSSE {
-	return func(cfg *sseCfg) {
+func OptHTTPAgentToken(tokenString string) OptHTTP {
+	return func(cfg *httpCfg) {
 		cfg.agentToken = tokenString
 	}
 }
 
-// OptSSEAgentTokenPassthrough decides if the HTTP request Authorization header
+// OptHTTPAgentTokenPassthrough decides if the HTTP request Authorization header
 // should be passed as-is to the minibridge backend.
-func OptSSEAgentTokenPassthrough(passthrough bool) OptSSE {
-	return func(cfg *sseCfg) {
+func OptHTTPAgentTokenPassthrough(passthrough bool) OptHTTP {
+	return func(cfg *httpCfg) {
 		cfg.agentTokenPassthrough = passthrough
 	}
 }
 
-// OptSSEMetricsManager sets the metric manager to use to collect
+// OptHTTPMetricsManager sets the metric manager to use to collect
 // prometheus metrics.
-func OptSSEMetricsManager(m *metrics.Manager) OptSSE {
-	return func(cfg *sseCfg) {
+func OptHTTPMetricsManager(m *metrics.Manager) OptHTTP {
+	return func(cfg *httpCfg) {
 		cfg.metricsManager = m
 	}
 }
 
-// OptSSETracer sets the otel trace.Tracer to use to trace requests
-func OptSSETracer(tracer trace.Tracer) OptSSE {
-	return func(cfg *sseCfg) {
+// OptHTTPTracer sets the otel trace.Tracer to use to trace requests
+func OptHTTPTracer(tracer trace.Tracer) OptHTTP {
+	return func(cfg *httpCfg) {
 		if tracer == nil {
 			tracer = noop.NewTracerProvider().Tracer("noop")
 		}
@@ -93,9 +93,9 @@ func OptSSETracer(tracer trace.Tracer) OptSSE {
 	}
 }
 
-// OptSSEBackendDialer sets the dialer to use to connect to the backend.
-func OptSSEBackendDialer(dialer func(ctx context.Context, network, addr string) (net.Conn, error)) OptSSE {
-	return func(cfg *sseCfg) {
+// OptHTTPBackendDialer sets the dialer to use to connect to the backend.
+func OptHTTPBackendDialer(dialer func(ctx context.Context, network, addr string) (net.Conn, error)) OptHTTP {
+	return func(cfg *httpCfg) {
 		cfg.backendDialer = dialer
 	}
 }

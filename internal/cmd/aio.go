@@ -140,21 +140,21 @@ var AIO = &cobra.Command{
 					"sse", sseEndpoint,
 					"messages", messageEndpoint,
 					"agent-token", agentToken != "",
-					"mode", "sse",
+					"mode", "http",
 					"server-tls", frontendServerTLSConfig != nil,
 					"server-mtls", mtlsMode(frontendServerTLSConfig),
 					"listen", listen,
 				)
 
-				proxy = frontend.NewSSE(listen, "ws://self/ws", frontendServerTLSConfig, nil,
-					frontend.OptSSEBackendDialer(dialer),
-					frontend.OptSSEStreamEndpoint(sseEndpoint),
-					frontend.OptSSEMessageEndpoint(messageEndpoint),
-					frontend.OptSSEAgentToken(agentToken),
-					frontend.OptSSEAgentTokenPassthrough(true),
-					frontend.OptSSECORSPolicy(corsPolicy),
-					frontend.OptSSEMetricsManager(mm),
-					frontend.OptSSETracer(tracer),
+				proxy = frontend.NewHTTP(listen, "ws://self/ws", frontendServerTLSConfig, nil,
+					frontend.OptHTTPBackendDialer(dialer),
+					frontend.OptHTTPStreamEndpoint(sseEndpoint),
+					frontend.OptHTTPMessageEndpoint(messageEndpoint),
+					frontend.OptHTTPAgentToken(agentToken),
+					frontend.OptHTTPAgentTokenPassthrough(true),
+					frontend.OptHTTPCORSPolicy(corsPolicy),
+					frontend.OptHTTPMetricsManager(mm),
+					frontend.OptHTTPTracer(tracer),
 				)
 			} else {
 

@@ -93,21 +93,21 @@ var Frontend = &cobra.Command{
 				"backend", backendURL,
 				"sse", sseEndpoint,
 				"messages", messageEndpoint,
-				"mode", "sse",
+				"mode", "http",
 				"server-tls", serverTLSConfig != nil,
 				"server-mtls", mtlsMode(serverTLSConfig),
 				"client-tls", clientTLSConfig != nil,
 				"listen", listen,
 			)
 
-			proxy = frontend.NewSSE(listen, backendURL, serverTLSConfig, clientTLSConfig,
-				frontend.OptSSEStreamEndpoint(sseEndpoint),
-				frontend.OptSSEMessageEndpoint(messageEndpoint),
-				frontend.OptSSEAgentToken(agentToken),
-				frontend.OptSSEAgentTokenPassthrough(agentTokenPassthrough),
-				frontend.OptSSECORSPolicy(corsPolicy),
-				frontend.OptSSEMetricsManager(mm),
-				frontend.OptSSETracer(tracer),
+			proxy = frontend.NewHTTP(listen, backendURL, serverTLSConfig, clientTLSConfig,
+				frontend.OptHTTPStreamEndpoint(sseEndpoint),
+				frontend.OptHTTPMessageEndpoint(messageEndpoint),
+				frontend.OptHTTPAgentToken(agentToken),
+				frontend.OptHTTPAgentTokenPassthrough(agentTokenPassthrough),
+				frontend.OptHTTPCORSPolicy(corsPolicy),
+				frontend.OptHTTPMetricsManager(mm),
+				frontend.OptHTTPTracer(tracer),
 			)
 
 		} else {
