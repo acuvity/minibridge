@@ -1,5 +1,9 @@
 # Minibridge
 
+[![Build](https://github.com/acuvity/minibridge/actions/workflows/build.yaml/badge.svg?branch=main)](https://github.com/acuvity/minibridge/actions/workflows/build.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/acuvity/minibridge?cache)](https://goreportcard.com/report/github.com/acuvity/minibridge)
+[![GoDoc](https://pkg.go.dev/badge/github.com/acuvity/minibridge.svg)](https://pkg.go.dev/github.com/acuvity/minibridge)
+
 Minibridge serves as a backend-to-frontend bridge, streamlining and securing
 communication between Agents and MCP servers. It safely exposes [MCP
 servers](https://modelcontextprotocol.io) to the internet and can optionally
