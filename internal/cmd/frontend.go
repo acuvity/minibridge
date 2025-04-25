@@ -19,8 +19,9 @@ func init() {
 
 	fFrontend.StringP("listen", "l", "", "listen address of the bridge for incoming connections. If this is unset, stdio is used.")
 	fFrontend.StringP("backend", "A", "", "URL of the minibridge backend to connect to.")
-	fFrontend.String("endpoint-messages", "/message", "when using HTTP, sets the endpoint to post messages.")
-	fFrontend.String("endpoint-sse", "/sse", "when using HTTP, sets the endpoint to connect to the event stream.")
+	fFrontend.String("endpoint-mcp", "/mcp", "when using HTTP, sets the endpoint to send messages (proto 2025-03-26).")
+	fFrontend.String("endpoint-messages", "/message", "when using HTTP, sets the endpoint to post messages (proto 2024-11-05).")
+	fFrontend.String("endpoint-sse", "/sse", "when using HTTP, sets the endpoint to connect to the event stream (proto 2024-11-05).")
 	fFrontend.BoolP("agent-token-passthrough", "b", false, "forwards incoming HTTP Authorization header to the minibridge backend as-is.")
 
 	Frontend.Flags().AddFlagSet(fFrontend)
@@ -44,6 +45,7 @@ var Frontend = &cobra.Command{
 
 		listen := viper.GetString("listen")
 		backendURL := viper.GetString("backend")
+		mcpEndpoint := viper.GetString("endpoint-mcp")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 		agentToken := viper.GetString("agent-token")
@@ -73,7 +75,7 @@ var Frontend = &cobra.Command{
 
 		tracer, err := makeTracer(cmd.Context(), "backend")
 		if err != nil {
-			return fmt.Errorf("unable to configure tracer: %w", err)
+			return fmt.Errorf("unabe to configure tracer: %w", err)
 		}
 
 		corsPolicy := makeCORSPolicy()
@@ -91,6 +93,7 @@ var Frontend = &cobra.Command{
 
 			slog.Info("Minibridge frontend configured",
 				"backend", backendURL,
+				"mcp", mcpEndpoint,
 				"sse", sseEndpoint,
 				"messages", messageEndpoint,
 				"mode", "http",
@@ -101,7 +104,8 @@ var Frontend = &cobra.Command{
 			)
 
 			proxy = frontend.NewHTTP(listen, backendURL, serverTLSConfig, clientTLSConfig,
-				frontend.OptHTTPStreamEndpoint(sseEndpoint),
+				frontend.OptHTTPMCPEndpoint(mcpEndpoint),
+				frontend.OptHTTPSSEEndpoint(sseEndpoint),
 				frontend.OptHTTPMessageEndpoint(messageEndpoint),
 				frontend.OptHTTPAgentToken(agentToken),
 				frontend.OptHTTPAgentTokenPassthrough(agentTokenPassthrough),

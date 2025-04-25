@@ -186,6 +186,86 @@ func (p *httpFrontend) releaseSession(sid string) {
 	p.Unlock()
 }
 
+func (p *httpFrontend) handleMCP(w http.ResponseWriter, req *http.Request) {
+
+	var err error
+
+	m := func(int) time.Duration { return 0 }
+	if p.cfg.metricsManager != nil {
+		m = p.cfg.metricsManager.MeasureRequest(req.Method, req.URL.Path)
+	}
+
+	ctx, span := p.cfg.tracer.Start(req.Context(), "streamable")
+	defer span.End()
+
+	if req.Method != http.MethodPost && req.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		m(http.StatusMethodNotAllowed)
+		return
+	}
+
+	slog.Debug("Handling new streamable request", "client", req.RemoteAddr)
+
+	var s *session
+	if sid := req.Header.Get("Mcp-Session-Id"); sid != "" {
+		s = p.acquireSession(sid)
+	} else if s, err = p.startSession(ctx, req); err != nil {
+		http.Error(w, fmt.Sprintf("unable to start session: %s", err), http.StatusForbidden)
+		m(http.StatusForbidden)
+		return
+	}
+	defer p.releaseSession(s.id)
+	w.Header().Set("Mcp-Session-Id", s.id)
+
+	span.SetAttributes(attribute.String("session", s.id))
+
+	// check the creds hash are identical to prevent session id reuse.
+	if hashCreds(p.getCreds(req)) != s.credHash {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		m(http.StatusUnauthorized)
+		return
+	}
+
+	if req.Method == http.MethodPost {
+		buf, err := io.ReadAll(req.Body)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("unable to read body: %s", err), http.StatusBadRequest)
+			m(http.StatusBadRequest)
+			return
+		}
+		defer func() { _ = req.Body.Close() }()
+
+		s.ws.Write(data.Sanitize(buf))
+	}
+
+	switch req.Header.Get("Accept") {
+
+	case "application/json":
+
+		if req.Method == http.MethodGet {
+			http.Error(w, "Not Acceptable: only text/event-stream can be accepted during GET", http.StatusNotAcceptable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+
+		select {
+
+		case data := <-s.ws.Read():
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(data)
+
+		case <-ctx.Done():
+			return
+		}
+
+	case "text/event-stream":
+		p.startStream(ctx, w, req, s, false)
+
+	default:
+		http.Error(w, "Accept must be application/json or text/event-stream", http.StatusNotAcceptable)
+	}
+}
+
 func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	m := func(int) time.Duration { return 0 }
@@ -350,6 +430,9 @@ func (p *httpFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	switch req.URL.Path {
+
+	case p.cfg.mcpEndpoint:
+		p.handleMCP(w, req)
 
 	case p.cfg.sseEndpoint:
 		p.handleSSE(w, req)

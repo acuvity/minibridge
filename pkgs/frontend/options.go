@@ -11,6 +11,7 @@ import (
 )
 
 type httpCfg struct {
+	mcpEndpoint           string
 	sseEndpoint           string
 	messagesEndpoint      string
 	agentTokenPassthrough bool
@@ -23,6 +24,7 @@ type httpCfg struct {
 
 func newHTTPCfg() httpCfg {
 	return httpCfg{
+		mcpEndpoint:      "/mcp",
 		sseEndpoint:      "/sse",
 		messagesEndpoint: "/message",
 		tracer:           noop.NewTracerProvider().Tracer("noop"),
@@ -32,12 +34,30 @@ func newHTTPCfg() httpCfg {
 // OptHTTP are options that can be given to NewSSE().
 type OptHTTP func(*httpCfg)
 
-// OptHTTPStreamEndpoint sets the sse endpoint
+// OptHTTPMCPEndpoint sets the mcp endpoint (protocol 2025-03-26)
+// where agents can connect to the response stream.
+// Defaults to /mcp
+func OptHTTPMCPEndpoint(ep string) OptHTTP {
+	return func(cfg *httpCfg) {
+		cfg.mcpEndpoint = ep
+	}
+}
+
+// OptHTTPSSEEndpoint sets the sse endpoint (protocol 2024-11-05)
 // where agents can connect to the response stream.
 // Defaults to /sse
-func OptHTTPStreamEndpoint(ep string) OptHTTP {
+func OptHTTPSSEEndpoint(ep string) OptHTTP {
 	return func(cfg *httpCfg) {
 		cfg.sseEndpoint = ep
+	}
+}
+
+// OptHTTPMessageEndpoint sets the message endpoint (protocol 2024-11-05)
+// where agents can post request.
+// Defaults to /messages
+func OptHTTPMessageEndpoint(ep string) OptHTTP {
+	return func(cfg *httpCfg) {
+		cfg.messagesEndpoint = ep
 	}
 }
 
@@ -46,15 +66,6 @@ func OptHTTPStreamEndpoint(ep string) OptHTTP {
 func OptHTTPCORSPolicy(policy *bahamut.CORSPolicy) OptHTTP {
 	return func(cfg *httpCfg) {
 		cfg.corsPolicy = policy
-	}
-}
-
-// OptHTTPMessageEndpoint sets the message endpoint
-// where agents can post request.
-// Defaults to /messages
-func OptHTTPMessageEndpoint(ep string) OptHTTP {
-	return func(cfg *httpCfg) {
-		cfg.messagesEndpoint = ep
 	}
 }
 
