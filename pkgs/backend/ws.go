@@ -362,12 +362,21 @@ func (p *wsBackend) police(ctx context.Context, spc *api.SpanContext, rtype api.
 	}
 
 	rcall, err := p.cfg.policer.Police(ctx, req)
-	if err != nil {
 
+	logFunc := slog.Info
+	if !p.cfg.policerEnforced && err != nil {
+		logFunc = slog.Warn
+	}
+	defer logFunc("Policer result", "allowed", err == nil, "enforced", p.cfg.policerEnforced, "err", err)
+
+	if err != nil {
 		defer m(false)
 
 		if errors.Is(err, api.ErrBlocked) {
 			span.SetStatus(codes.Error, err.Error())
+			if !p.cfg.policerEnforced {
+				return rawData, nil
+			}
 			return makeMCPError(call.ID, err), err
 		}
 
@@ -383,7 +392,6 @@ func (p *wsBackend) police(ctx context.Context, spc *api.SpanContext, rtype api.
 			defer m(false)
 			return nil, fmt.Errorf("unable to reencode modified mcp call: %w", err)
 		}
-
 	}
 
 	m(true)

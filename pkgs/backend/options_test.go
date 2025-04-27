@@ -23,7 +23,7 @@ func (f fakePolicer) Police(context.Context, api.Request) (*api.MCPCall, error) 
 
 func (f fakePolicer) Type() string { return "fake" }
 
-func TestThing(t *testing.T) {
+func TestOptions(t *testing.T) {
 
 	Convey("OptPolicer should work", t, func() {
 		cfg := newWSCfg()
@@ -84,5 +84,12 @@ func TestThing(t *testing.T) {
 		listener := tls.NewListener(nil, nil)
 		OptListener(listener)(&cfg)
 		So(cfg.listener, ShouldEqual, listener)
+	})
+
+	Convey("OptPolicerEnforce should work", t, func() {
+		cfg := newWSCfg()
+		So(cfg.policerEnforced, ShouldBeTrue)
+		OptPolicerEnforce(false)(&cfg)
+		So(cfg.policerEnforced, ShouldBeFalse)
 	})
 }

@@ -51,7 +51,7 @@ var Backend = &cobra.Command{
 			return err
 		}
 
-		policer, err := makePolicer()
+		policer, penforce, err := makePolicer()
 		if err != nil {
 			return fmt.Errorf("unable to make policer: %w", err)
 		}
@@ -90,6 +90,7 @@ var Backend = &cobra.Command{
 
 		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,
 			backend.OptPolicer(policer),
+			backend.OptPolicerEnforce(penforce),
 			backend.OptDumpStderrOnError(viper.GetString("log-format") != "json"),
 			backend.OptCORSPolicy(corsPolicy),
 			backend.OptSBOM(sbom),

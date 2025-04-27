@@ -62,7 +62,7 @@ var AIO = &cobra.Command{
 			)
 		}
 
-		policer, err := makePolicer()
+		policer, penforce, err := makePolicer()
 		if err != nil {
 			return fmt.Errorf("unable to make policer: %w", err)
 		}
@@ -109,6 +109,7 @@ var AIO = &cobra.Command{
 			proxy := backend.NewWebSocket("self", nil, mcpServer,
 				backend.OptListener(listener),
 				backend.OptPolicer(policer),
+				backend.OptPolicerEnforce(penforce),
 				backend.OptDumpStderrOnError(viper.GetString("log-format") != "json"),
 				backend.OptSBOM(sbom),
 				backend.OptClientOptions(clientOpts...),

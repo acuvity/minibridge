@@ -13,19 +13,21 @@ import (
 )
 
 type wsCfg struct {
-	clientOpts     []client.Option
-	corsPolicy     *bahamut.CORSPolicy
-	dumpStderr     bool
-	listener       net.Listener
-	metricsManager *metrics.Manager
-	policer        policer.Policer
-	sbom           scan.SBOM
-	tracer         trace.Tracer
+	clientOpts      []client.Option
+	corsPolicy      *bahamut.CORSPolicy
+	dumpStderr      bool
+	listener        net.Listener
+	metricsManager  *metrics.Manager
+	policer         policer.Policer
+	policerEnforced bool
+	sbom            scan.SBOM
+	tracer          trace.Tracer
 }
 
 func newWSCfg() wsCfg {
 	return wsCfg{
-		tracer: noop.NewTracerProvider().Tracer("noop"),
+		tracer:          noop.NewTracerProvider().Tracer("noop"),
+		policerEnforced: true,
 	}
 }
 
@@ -36,6 +38,14 @@ type Option func(*wsCfg)
 func OptPolicer(policer policer.Policer) Option {
 	return func(cfg *wsCfg) {
 		cfg.policer = policer
+	}
+}
+
+// OptPolicerEnforce sets the Policer decision should be enforced
+// or just logged. The default is true if a policer is set
+func OptPolicerEnforce(enforced bool) Option {
+	return func(cfg *wsCfg) {
+		cfg.policerEnforced = enforced
 	}
 }
 

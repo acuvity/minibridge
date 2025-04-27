@@ -40,6 +40,7 @@ func initSharedFlagSet() {
 	fHealth.String("health-listen", "", "if set, start health server on that address.")
 
 	fPolicer.StringP("policer-type", "P", "", "type of policer to use. 'rego' or 'http'.")
+	fPolicer.Bool("policer-enforce", true, "enforce policy or only log verdict.")
 	fPolicer.String("policer-rego-policy", "", "path to a rego policy file for the rego policer.")
 	fPolicer.String("policer-http-url", "", "URL of the HTTP policer to POST agent policing requests.")
 	fPolicer.String("policer-http-token", "", "token to use to authenticate against the HTTP policer.")

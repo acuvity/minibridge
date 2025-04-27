@@ -127,9 +127,10 @@ func startHealthServer(ctx context.Context) (manager *metrics.Manager) {
 	return manager
 }
 
-func makePolicer() (policer.Policer, error) {
+func makePolicer() (policer.Policer, bool, error) {
 
 	pType := viper.GetString("policer-type")
+	pEnforce := viper.GetBool("policer-enforce")
 
 	switch pType {
 
@@ -141,21 +142,21 @@ func makePolicer() (policer.Policer, error) {
 		httpToken := viper.GetString("policer-http-token")
 
 		if httpURL == "" {
-			return nil, fmt.Errorf("you must set --policer-http-url when using an http policer")
+			return nil, false, fmt.Errorf("you must set --policer-http-url when using an http policer")
 		}
 
 		var pool *x509.CertPool
 		if httpCA != "" {
 			caData, err := os.ReadFile(httpCA) // #nosec: G304
 			if err != nil {
-				return nil, fmt.Errorf("unable to read policer CA: %w", err)
+				return nil, false, fmt.Errorf("unable to read policer CA: %w", err)
 			}
 			pool.AppendCertsFromPEM(caData)
 		} else {
 			var err error
 			pool, err = x509.SystemCertPool()
 			if err != nil {
-				return nil, fmt.Errorf("unable to load system ca pool: %w", err)
+				return nil, false, fmt.Errorf("unable to load system ca pool: %w", err)
 			}
 		}
 
@@ -164,32 +165,37 @@ func makePolicer() (policer.Policer, error) {
 			RootCAs:            pool,
 		}
 
-		slog.Info("Policer configured", "type", "http", "url", httpURL)
+		slog.Info("Policer configured", "type", "http", "url", httpURL, "enforced", pEnforce)
 
-		return policer.NewHTTP(httpURL, httpToken, tlsConfig), nil
+		return policer.NewHTTP(httpURL, httpToken, tlsConfig), pEnforce, nil
 
 	case "rego":
 
 		regoFile := viper.GetString("policer-rego-policy")
 
 		if regoFile == "" {
-			return nil, fmt.Errorf("you must set --policer-rego-policy when using a rego policer")
+			return nil, false, fmt.Errorf("you must set --policer-rego-policy when using a rego policer")
 		}
 
 		data, err := os.ReadFile(regoFile) // #nosec: G304
 		if err != nil {
-			return nil, fmt.Errorf("unable open rego policy file: %w", err)
+			return nil, false, fmt.Errorf("unable open rego policy file: %w", err)
 		}
 
-		slog.Info("Policer configured", "type", "rego", "policy", regoFile)
+		slog.Info("Policer configured", "type", "rego", "policy", regoFile, "enforced", pEnforce)
 
-		return policer.NewRego(string(data))
+		p, err := policer.NewRego(string(data))
+		if err != nil {
+			return nil, false, err
+		}
+
+		return p, pEnforce, nil
 
 	case "":
-		return nil, nil
+		return nil, false, nil
 
 	default:
-		return nil, fmt.Errorf("unknown type of policer: %s", pType)
+		return nil, false, fmt.Errorf("unknown type of policer: %s", pType)
 	}
 
 }
