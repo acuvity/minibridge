@@ -75,6 +75,8 @@ func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, e
 		return nil, fmt.Errorf("unable to decode response body: %w", err)
 	}
 
+	sresp.MCP.ID = preq.MCP.ID
+
 	if sresp.Allow {
 		return sresp.MCP, nil
 	}

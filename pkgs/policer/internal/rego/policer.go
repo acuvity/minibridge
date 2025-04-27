@@ -104,5 +104,7 @@ func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, e
 		return nil, fmt.Errorf("unable to decode rego mcp into valid MCP call: %w", err)
 	}
 
+	mcall.ID = preq.MCP.ID
+
 	return mcall, nil
 }
