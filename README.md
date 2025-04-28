@@ -329,7 +329,8 @@ used.
 In addition, if `allow` is `true`, and `mcp` is non null, Minibridge will swap
 the original MCP call with the one provided in the response, allowing Policers
 to mutate the call. For instance this can be used to hide some tools based on
-the agent identity.
+the agent identity. You cannot change the MCP call id. If you do, it will be
+overwritten with the original ID anyway.
 
 ### Available Policers
 
