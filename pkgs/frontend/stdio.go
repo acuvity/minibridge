@@ -89,10 +89,10 @@ func (p *stdioFrontend) wspump(ctx context.Context) error {
 			return nil
 
 		default:
-			session, err := connectWS(ctx, p.cfg.backendDialer, p.backendURL, p.tlsConfig, agentInfo{
-				token:      p.cfg.agentToken,
-				userAgent:  "stdio",
-				remoteAddr: "local",
+			session, err := Connect(ctx, p.cfg.backendDialer, p.backendURL, p.tlsConfig, AgentInfo{
+				Token:      p.cfg.agentToken,
+				UserAgent:  "stdio",
+				RemoteAddr: "local",
 			})
 			if err != nil {
 

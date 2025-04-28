@@ -16,30 +16,33 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-type agentInfo struct {
-	token       string
-	authHeaders []string
-	userAgent   string
-	remoteAddr  string
+// AgentInfo holds information about the agent
+// who sent an MCPCall.
+type AgentInfo struct {
+	Token       string
+	AuthHeaders []string
+	UserAgent   string
+	RemoteAddr  string
 }
 
-func connectWS(
+// Connect is a low level function to connect to the backend's websocket
+func Connect(
 	ctx context.Context,
 	dialer func(ctx context.Context, network, addr string) (net.Conn, error),
 	backendURL string,
 	tlsConfig *tls.Config,
-	info agentInfo,
+	info AgentInfo,
 ) (wsc.Websocket, error) {
 
 	slog.Debug("New websocket connection",
 		"url", backendURL,
-		"using-token", info.token != "",
-		"using-headers", len(info.authHeaders) > 0,
+		"using-token", info.Token != "",
+		"using-headers", len(info.AuthHeaders) > 0,
 		"tls", strings.HasPrefix(backendURL, "wss://"),
 		"tls-config", tlsConfig != nil,
 	)
 
-	if dialer == nil && (info.token != "" || len(info.authHeaders) > 0) && tlsConfig == nil {
+	if dialer == nil && (info.Token != "" || len(info.AuthHeaders) > 0) && tlsConfig == nil {
 		slog.Warn("Security: connecting to a websocket with crendentials sent over the network in clear-text. Refused. Credentials have been stripped. Request will proceed and will likely fail.")
 	}
 
@@ -51,17 +54,17 @@ func connectWS(
 	}
 
 	wsconfig.Headers = http.Header{
-		"X-Forwarded-UA":  {info.userAgent},
-		"X-Forwarded-For": {info.remoteAddr},
+		"X-Forwarded-UA":  {info.UserAgent},
+		"X-Forwarded-For": {info.RemoteAddr},
 	}
 
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(wsconfig.Headers))
 
 	if tlsConfig != nil || dialer != nil {
-		if info.token != "" {
-			wsconfig.Headers["Authorization"] = []string{"Basic " + base64.StdEncoding.EncodeToString(fmt.Appendf([]byte{}, "Bearer:%s", info.token))}
-		} else if len(info.authHeaders) > 0 {
-			wsconfig.Headers["Authorization"] = info.authHeaders
+		if info.Token != "" {
+			wsconfig.Headers["Authorization"] = []string{"Basic " + base64.StdEncoding.EncodeToString(fmt.Appendf([]byte{}, "Bearer:%s", info.Token))}
+		} else if len(info.AuthHeaders) > 0 {
+			wsconfig.Headers["Authorization"] = info.AuthHeaders
 		}
 	}
 

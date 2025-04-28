@@ -127,11 +127,11 @@ func (p *httpFrontend) startSession(ctx context.Context, req *http.Request) (*se
 	token, authHeader := p.getCreds(req)
 	ch := hashCreds(token, authHeader)
 
-	ws, err := connectWS(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, agentInfo{
-		token:       token,
-		authHeaders: authHeader,
-		remoteAddr:  req.RemoteAddr,
-		userAgent:   req.UserAgent(),
+	ws, err := Connect(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, AgentInfo{
+		Token:       token,
+		AuthHeaders: authHeader,
+		RemoteAddr:  req.RemoteAddr,
+		UserAgent:   req.UserAgent(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to register session backend: %w", err)
