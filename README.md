@@ -410,7 +410,7 @@ input, and the rego policy must either return and `allow := true` or an empty
 
 For instance, to allow the request:
 
-```regp
+```rego
 package main
 import rego.v1
 
