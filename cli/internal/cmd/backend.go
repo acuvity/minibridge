@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.acuvity.ai/minibridge/pkgs/backend"
-	"go.acuvity.ai/minibridge/pkgs/client"
+	"go.acuvity.ai/minibridge/pkgs/backend/client"
 )
 
 var fBackend = pflag.NewFlagSet("backend", pflag.ExitOnError)

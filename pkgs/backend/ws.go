@@ -18,9 +18,9 @@ import (
 	"github.com/karlseguin/ccache/v3"
 	"github.com/smallnest/ringbuffer"
 	"go.acuvity.ai/elemental"
-	"go.acuvity.ai/minibridge/pkgs/client"
-	"go.acuvity.ai/minibridge/pkgs/cors"
-	"go.acuvity.ai/minibridge/pkgs/data"
+	"go.acuvity.ai/minibridge/pkgs/backend/client"
+	"go.acuvity.ai/minibridge/pkgs/internal/cors"
+	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/scan"
 	"go.acuvity.ai/wsc"
@@ -196,27 +196,27 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		select {
 
-		case buf := <-session.Read():
+		case data := <-session.Read():
 
-			slog.Debug("Received data from websocket", "msg", string(buf))
+			slog.Debug("Received data from websocket", "msg", string(data))
 
-			if buf, err = p.handleMCPCall(ctx, cache, session, agent, buf, api.CallTypeRequest); err != nil {
+			if data, err = p.handleMCPCall(ctx, cache, session, agent, data, api.CallTypeRequest); err != nil {
 				slog.Error("Unable to handle mcp agent message", err)
 				continue
 			}
 
-			stream.Stdin <- data.Sanitize(buf)
+			stream.Stdin <- sanitize.Data(data)
 
-		case buf := <-stream.Stdout:
+		case data := <-stream.Stdout:
 
-			slog.Debug("Received data from MCP Server", "msg", string(buf))
+			slog.Debug("Received data from MCP Server", "msg", string(data))
 
-			if buf, err = p.handleMCPCall(ctx, cache, session, agent, buf, api.CallTypeResponse); err != nil {
+			if data, err = p.handleMCPCall(ctx, cache, session, agent, data, api.CallTypeResponse); err != nil {
 				slog.Error("Unable to handle mcp server message", err)
 				continue
 			}
 
-			session.Write(data.Sanitize(buf))
+			session.Write(sanitize.Data(data))
 
 		case data := <-stream.Stderr:
 			_, _ = rb.Write(data)
@@ -256,16 +256,16 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[context.Context], session wsc.Websocket, agent api.Agent, buf []byte, rtype api.CallType) (buff []byte, err error) {
+func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[context.Context], session wsc.Websocket, agent api.Agent, data []byte, rtype api.CallType) (buff []byte, err error) {
 
 	call := api.NewMCPCall(-1)
-	if err := elemental.Decode(elemental.EncodingTypeJSON, buf, &call); err != nil {
+	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
 		var oerr = err
 		call.Error = api.NewMCPError(err)
-		if buf, err = elemental.Encode(elemental.EncodingTypeJSON, call); err != nil {
+		if data, err = elemental.Encode(elemental.EncodingTypeJSON, call); err != nil {
 			return nil, fmt.Errorf("unable to decode mcp call and to encode an error: %w (original: %w)", err, oerr)
 		}
-		return buf, nil
+		return data, nil
 	}
 
 	// We check if we have the _meta params in the call and if so, we get the otel context from there.
@@ -295,22 +295,22 @@ func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[conte
 		}
 	}
 
-	if buf, err = p.police(ctx, spc, rtype, agent, call, buf); err != nil {
+	if data, err = p.police(ctx, spc, rtype, agent, call, data); err != nil {
 
 		var oerr = err
 		if errors.Is(err, api.ErrBlocked) {
-			session.Write(data.Sanitize(buf))
+			session.Write(sanitize.Data(data))
 			return nil, nil
 		}
 
 		call.Error = api.NewMCPError(err)
-		if buf, err = elemental.Encode(elemental.EncodingTypeJSON, call); err != nil {
+		if data, err = elemental.Encode(elemental.EncodingTypeJSON, call); err != nil {
 			return nil, fmt.Errorf("unable to police mcp call: %w (original: %w)", err, oerr)
 		}
-		return buf, nil
+		return data, nil
 	}
 
-	return buf, nil
+	return data, nil
 }
 
 func (p *wsBackend) police(ctx context.Context, spc *api.SpanContext, rtype api.CallType, agent api.Agent, call api.MCPCall, rawData []byte) ([]byte, error) {

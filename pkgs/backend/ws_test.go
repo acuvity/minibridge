@@ -8,7 +8,7 @@ import (
 	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
-	"go.acuvity.ai/minibridge/pkgs/client"
+	"go.acuvity.ai/minibridge/pkgs/backend/client"
 	"go.acuvity.ai/minibridge/pkgs/frontend"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/wsc"
@@ -24,7 +24,7 @@ func freePort() int {
 	if err != nil {
 		panic(err)
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	return l.Addr().(*net.TCPAddr).Port
 }
 

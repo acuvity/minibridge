@@ -1,10 +1,10 @@
-package data
+package sanitize
 
 import "bytes"
 
-// Sanitize sanitizes the data for internal
+// Data sanitizes the data for internal
 // transport. It removed all trailing '\n' and `\r`
-func Sanitize(data []byte) []byte {
+func Data(data []byte) []byte {
 
 	return bytes.TrimRight(data, "\n\r")
 }

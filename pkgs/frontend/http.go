@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
-	"go.acuvity.ai/minibridge/pkgs/cors"
-	"go.acuvity.ai/minibridge/pkgs/data"
+	"go.acuvity.ai/minibridge/pkgs/internal/cors"
+	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
 	"go.acuvity.ai/wsc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
@@ -258,7 +258,7 @@ func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	buf, err := io.ReadAll(req.Body)
+	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to read body: %s", err), http.StatusBadRequest)
 		m(http.StatusBadRequest)
@@ -266,7 +266,7 @@ func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) 
 	}
 	defer func() { _ = req.Body.Close() }()
 
-	log.Debug("Message data", "msg", string(buf))
+	log.Debug("Message data", "msg", string(data))
 
 	if req.Proto == "HTTP/1.1" {
 		w.Header().Add("Connection", "keep-alive")
@@ -277,7 +277,7 @@ func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) 
 
 	defer m(http.StatusAccepted)
 
-	session.ws.Write(data.Sanitize(buf))
+	session.ws.Write(sanitize.Data(data))
 }
 
 func (p *httpFrontend) startStream(ctx context.Context, w http.ResponseWriter, req *http.Request, s *session, backwardCompat bool) {
@@ -316,15 +316,15 @@ func (p *httpFrontend) startStream(ctx context.Context, w http.ResponseWriter, r
 			log.Debug("Client is gone from stream")
 			return
 
-		case buf := <-s.ws.Read():
+		case data := <-s.ws.Read():
 
-			if len(buf) == 0 {
+			if len(data) == 0 {
 				continue
 			}
 
-			log.Debug("Received data from backend", "data", string(buf))
+			log.Debug("Received data from backend", "data", string(data))
 
-			if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", string(data.Sanitize(buf))); err != nil {
+			if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", string(sanitize.Data(data))); err != nil {
 				log.Error("Unable to write event", err)
 				continue
 			}

@@ -17,6 +17,14 @@ func init() {
 
 	Root.PersistentFlags().String("log-level", "info", "sets the log level.")
 	Root.PersistentFlags().String("log-format", "console", "sets the log format.")
+
+	Root.AddCommand(
+		Backend,
+		Frontend,
+		AIO,
+		Completion,
+		Scan,
+	)
 }
 
 var Root = &cobra.Command{

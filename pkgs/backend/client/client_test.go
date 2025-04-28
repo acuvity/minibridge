@@ -19,7 +19,10 @@ func TestClient(t *testing.T) {
 		}
 		cl := NewStdio(srv)
 
-		stream, err := cl.Start(t.Context())
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		stream, err := cl.Start(ctx)
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
 
@@ -36,7 +39,10 @@ func TestClient(t *testing.T) {
 		}
 		cl := NewStdio(srv)
 
-		stream, err := cl.Start(t.Context())
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		stream, err := cl.Start(ctx)
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
 
@@ -51,7 +57,10 @@ func TestClient(t *testing.T) {
 		}
 		cl := NewStdio(srv)
 
-		stream, err := cl.Start(t.Context())
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		stream, err := cl.Start(ctx)
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldEqual, `unable to start command: exec: "dog": executable file not found in $PATH`)
 		So(stream, ShouldBeNil)
@@ -65,7 +74,10 @@ func TestClient(t *testing.T) {
 		}
 		cl := NewStdio(srv)
 
-		stream, err := cl.Start(t.Context())
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		stream, err := cl.Start(ctx)
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
 		time.Sleep(1050 * time.Millisecond)
@@ -85,7 +97,10 @@ func TestClient(t *testing.T) {
 		}
 		cl := NewStdio(srv)
 
-		stream, err := cl.Start(t.Context())
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		stream, err := cl.Start(ctx)
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
 		So(<-stream.Exit, ShouldBeNil)
@@ -103,7 +118,10 @@ func TestClient(t *testing.T) {
 		}
 		cl := NewStdio(srv, OptUseTempDir(true))
 
-		stream, err := cl.Start(t.Context())
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		stream, err := cl.Start(ctx)
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
 		So(<-stream.Exit, ShouldBeNil)

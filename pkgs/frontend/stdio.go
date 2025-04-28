@@ -11,7 +11,7 @@ import (
 	"os/user"
 	"time"
 
-	"go.acuvity.ai/minibridge/pkgs/data"
+	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
 )
 
 type stdioFrontend struct {
@@ -122,10 +122,10 @@ func (p *stdioFrontend) wspump(ctx context.Context) error {
 				select {
 
 				case buf := <-p.wsWrite:
-					session.Write(data.Sanitize(buf))
+					session.Write(sanitize.Data(buf))
 
-				case buf := <-session.Read():
-					fmt.Println(string(data.Sanitize(buf)))
+				case data := <-session.Read():
+					fmt.Println(string(sanitize.Data(data)))
 
 				case err := <-session.Error():
 					failures++
@@ -169,7 +169,7 @@ func (p *stdioFrontend) stdiopump(ctx context.Context) {
 				continue
 			}
 
-			p.wsWrite <- data.Sanitize(buf)
+			p.wsWrite <- sanitize.Data(buf)
 
 		case <-ctx.Done():
 			return

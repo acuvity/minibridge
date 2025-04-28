@@ -1,4 +1,4 @@
-package data
+package sanitize
 
 import (
 	"reflect"
@@ -85,7 +85,7 @@ func TestSanitize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tArgs := tt.args(t)
 
-			got1 := Sanitize(tArgs.data)
+			got1 := Data(tArgs.data)
 
 			if !reflect.DeepEqual(got1, tt.want1) {
 				t.Errorf("Sanitize got1 = %v, want1: %v", got1, tt.want1)
