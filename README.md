@@ -110,9 +110,11 @@ You can now connect directly using a websocket client:
 
     wscat --connect ws://127.0.0.1:8000/ws
 
-> NOTE: use the `wss` scheme if you have started Minibridge backend with TLS.
+> [!NOTE]
+> use the `wss` scheme if you have started Minibridge backend with TLS.
 
-> NOTE: Today, Minibridge backend only supports MCP server over stdio.
+> [!NOTE]
+> Today, Minibridge backend only supports MCP server over stdio.
 
 In order to secure the connections, you need to enable HTTPS for incoming
 connections:
@@ -213,7 +215,8 @@ To generate a SBOM file:
 This will create `server.sbom` that contains all the hashes of the relevant
 parts.
 
-> NOTE: For now, only tools and prompts are part of the SBOM.
+> [!NOTE]
+> For now, only tools and prompts are part of the SBOM.
 
 ### Check SBOM Offline
 
@@ -260,7 +263,7 @@ There are various available policers in Minibridge:
 - Rego policer: runs a [rego](https://www.openpolicyagent.org/docs/latest)
   policy file on the request
 
-> NOTE: More policers will be added!
+> [!NOTE] More policers will be added!
 
 The Policer, if set, will be called and passed various information so it can
 make a decision on what to do with the request, based on the user who initiated
@@ -402,7 +405,8 @@ decide if the request should be allowed or not. The Police Request is passed an
 input, and the rego policy must either return and `allow := true` or an empty
 `deny` string array.
 
-> NOTE: the rego package must be named `main`.
+> [!NOTE]
+> The rego package must be named `main`.
 
 For instance, to allow the request:
 
