@@ -47,7 +47,6 @@ Inference](https://arize-ai.github.io/openinference).
     * [Global](#global)
     * [Forward](#forward)
 * [OTEL](#otel)
-* [Todos](#todos)
 
 <!-- vim-markdown-toc -->
 
@@ -466,14 +465,3 @@ To start the frontend in that mode:
 
 Minibridge support OpenTelemetry and can be configured to export spans using the
 OTEL [standard env variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/)
-
-## Todos
-
-Minibridge is still missing the following features:
-
-- [ ] Unit tests (started)
-- [x] Transport user information over the websocket channel
-- [x] Support for user extraction to pass to the policer
-- [x] Plug in prometheus metrics
-- [x] Opentelemetry
-- [x] Optimize communications between front/back in aio mode (use memconn)
