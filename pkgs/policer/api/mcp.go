@@ -16,6 +16,15 @@ type MCPError struct {
 	Data    any    `json:"data,omitempty"`
 }
 
+// NewMCPErrorFrom returns an *MCPError with code 500
+// and the given error
+func NewMCPError(err error) *MCPError {
+	return &MCPError{
+		Code:    500,
+		Message: err.Error(),
+	}
+}
+
 // MPCCall represents the inline MPC request.
 type MCPCall struct {
 	JSONRPC string         `json:"jsonrpc"`

@@ -258,9 +258,14 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[context.Context], session wsc.Websocket, agent api.Agent, buf []byte, rtype api.CallType) (buff []byte, err error) {
 
-	call := api.MCPCall{}
+	call := api.NewMCPCall(-1)
 	if err := elemental.Decode(elemental.EncodingTypeJSON, buf, &call); err != nil {
-		return nil, fmt.Errorf("unable to decode mcp call: %w", err)
+		var oerr = err
+		call.Error = api.NewMCPError(err)
+		if buf, err = elemental.Encode(elemental.EncodingTypeJSON, call); err != nil {
+			return nil, fmt.Errorf("unable to decode mcp call and to encode an error: %w (original: %w)", err, oerr)
+		}
+		return buf, nil
 	}
 
 	// We check if we have the _meta params in the call and if so, we get the otel context from there.
@@ -291,11 +296,18 @@ func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[conte
 	}
 
 	if buf, err = p.police(ctx, spc, rtype, agent, call, buf); err != nil {
+
+		var oerr = err
 		if errors.Is(err, api.ErrBlocked) {
 			session.Write(data.Sanitize(buf))
 			return nil, nil
 		}
-		return nil, fmt.Errorf("unable to police mcp call: %w", err)
+
+		call.Error = api.NewMCPError(err)
+		if buf, err = elemental.Encode(elemental.EncodingTypeJSON, call); err != nil {
+			return nil, fmt.Errorf("unable to police mcp call: %w (original: %w)", err, oerr)
+		}
+		return buf, nil
 	}
 
 	return buf, nil
