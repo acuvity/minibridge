@@ -1,6 +1,6 @@
 module go.acuvity.ai/minibridge
 
-go 1.24.1
+go 1.24.2
 
 require (
 	go.acuvity.ai/a3s v0.0.0-20250416135901-d1835cc310f7
@@ -14,14 +14,13 @@ require (
 
 require (
 	github.com/adrg/xdg v0.5.3
-	github.com/akutz/memconn v0.1.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/gorilla/websocket v1.5.3
 	github.com/karlseguin/ccache/v3 v3.0.6
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/open-policy-agent/opa v1.3.0
-	github.com/prometheus/client_golang v1.21.1
+	github.com/prometheus/client_golang v1.22.0
 	github.com/smallnest/ringbuffer v0.0.0-20250317021400-0da97b586904
 	github.com/smartystreets/goconvey v1.8.1
 	github.com/spaolacci/murmur3 v1.1.0
@@ -53,6 +52,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.5.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.3.6 // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
@@ -104,6 +104,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect

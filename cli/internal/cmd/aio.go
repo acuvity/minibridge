@@ -5,17 +5,15 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"os"
-	"path"
 	"time"
 
-	"github.com/akutz/memconn"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.acuvity.ai/minibridge/pkgs/backend"
 	"go.acuvity.ai/minibridge/pkgs/backend/client"
 	"go.acuvity.ai/minibridge/pkgs/frontend"
+	"go.acuvity.ai/minibridge/pkgs/memconn"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -85,11 +83,8 @@ var AIO = &cobra.Command{
 
 		mm := startHealthServer(ctx)
 
-		tmpFolder, err := os.MkdirTemp(os.TempDir(), "minibridge.run")
-		if err != nil {
-			return fmt.Errorf("unable to create temp dir: %w", err)
-		}
-		usocket := path.Join(tmpFolder, "aio.sock")
+		listener := memconn.NewListener()
+		defer func() { _ = listener.Close() }()
 
 		var eg errgroup.Group
 
@@ -108,12 +103,6 @@ var AIO = &cobra.Command{
 			)
 
 			slog.Info("Minibridge backend configured")
-
-			// listener, err := memconn.Listen("memu", "self")
-			listener, err := net.Listen("unix", usocket)
-			if err != nil {
-				return fmt.Errorf("unable to start memory listener: %w", err)
-			}
 
 			proxy := backend.NewWebSocket("self", nil, mcpServer,
 				backend.OptListener(listener),
@@ -141,7 +130,7 @@ var AIO = &cobra.Command{
 			}
 
 			dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return memconn.DialContext(cmd.Context(), "unix", usocket)
+				return listener.DialContext(cmd.Context())
 			}
 
 			if listen != "" {
