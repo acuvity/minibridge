@@ -170,7 +170,10 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	session, err := wsc.Accept(ctx, ws, wsc.Config{WriteChanSize: 64, ReadChanSize: 16})
+	session, err := wsc.Accept(ctx, ws, wsc.Config{
+		WriteChanSize: 64,
+		ReadChanSize:  16,
+	})
 	if err != nil {
 		hErr(w, fmt.Sprintf("unable to accept websocket: %s", err), http.StatusBadRequest, span)
 		m(http.StatusBadRequest)
@@ -231,26 +234,32 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 
 			data, _ := io.ReadAll(rb)
-			slog.Error("MCP Server exited", err)
+			slog.Error("MCP Server exited", "err", err)
 
-			if p.cfg.dumpStderr {
-				_, _ = fmt.Fprintf(os.Stderr, "---\n%s\n---\n", strings.TrimSpace(string(data)))
-			} else {
-				slog.Error("MCP Server stderr", "stderr", string(data))
+			if len(data) > 0 {
+				if p.cfg.dumpStderr {
+					_, _ = fmt.Fprintf(os.Stderr, "---\n%s\n---\n", strings.TrimSpace(string(data)))
+				} else {
+					slog.Error("MCP Server stderr", "stderr", string(data))
+				}
 			}
 
 			return
 
 		case err := <-session.Error():
-			slog.Debug("Websocket encoountered and error", err)
+			slog.Error("Backend websocket encountered and error", err)
 			return
 
-		case <-session.Done():
-			slog.Debug("Websocket has closed")
+		case err := <-session.Done():
+			if err != nil && !strings.HasSuffix(err.Error(), "websocket: close 1001 (going away)") {
+				slog.Error("Backend websocket has closed", err)
+			} else {
+				slog.Debug("Backend websocket has closed")
+			}
 			return
 
 		case <-ctx.Done():
-			slog.Debug("Client is gone")
+			slog.Debug("Client is gone", ctx.Err())
 			return
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -334,8 +335,12 @@ func (p *httpFrontend) startStream(ctx context.Context, w http.ResponseWriter, r
 				continue
 			}
 
-		case <-s.ws.Done():
-			log.Debug("Backend websocket is gone")
+		case err := <-s.ws.Done():
+			if err != nil && !strings.HasSuffix(err.Error(), "websocket: close 1001 (going away)") {
+				log.Error("Client websocket has closed", err)
+			} else {
+				log.Debug("Client websocket has closed")
+			}
 			return
 		}
 	}
