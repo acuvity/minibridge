@@ -4,3 +4,5 @@ dist
 *.token
 *.sbom
 unit_coverage.out
+go.work
+go.work.sum
