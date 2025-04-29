@@ -22,7 +22,6 @@ func newMCPMetaCarrier(call api.MCPCall) metaCarrier {
 					meta[k] = s
 				}
 			}
-			delete(call.Params, "_meta")
 		}
 	}
 

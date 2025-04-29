@@ -46,7 +46,7 @@ func TestCarrier(t *testing.T) {
 		So(len(c.meta), ShouldEqual, 1)
 		So(c.Get("a"), ShouldEqual, "42")
 		So(c.Keys(), ShouldResemble, []string{"a"})
-		So(call.Params["_meta"], ShouldBeNil)
+		So(call.Params["_meta"], ShouldNotBeNil)
 	})
 
 }
