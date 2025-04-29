@@ -42,18 +42,18 @@ Minibridge covers the following:
 
 ## Features comparisons
 
-| 🚀 **Feature**                     | 🔹 **MCP**       | 🔸 **Minibridge**        | 📦 **ARC (Acuvity Containers)** |
-| ---------------------------------- | ---------------- | ------------------------ | ------------------------------- |
-| 🌐 **Remote Access**               | ⚠️ HTTP/SSE Only | ✅ Built-in              | ✅ Built-in                     |
-| 🔒 **TLS Support**                 | ❌               | ✅ Built-in              | ✅ Built-in                     |
-| 📃 **Tool integrity check**        | ❌               | ✅ Built-in              | ✅ Built-in                     |
-| 📊 **Visualization and Tracing**   | ❌               | ✅ Built-in              | ✅ Built-in                     |
-| 🛡️ **Isolation**                   | ❌               | ⚠️ Basic                 | ✅ Built-in                     |
-| 🔐 **Security Policy Management**  | ❌               | 👤 Custom Implementation | ⚠️ Basic                        |
-| 🕵️ **Secrets Redaction**           | ❌               | 👤 Custom Implementation | ⚠️ Basic                        |
-| 🔑 **Authorization Controls**      | ❌               | 👤 Custom Implementation | 👤 Custom Implementation        |
-| 🧑‍💻 **PII Detection and Redaction** | ❌               | 👤 Custom Implementation | 👤 Custom Implementation        |
-| 📌 **Version Pinning**             | ❌               | ❌                       | ✅ Built-in                     |
+| 🚀 **Feature**                 | 🔹 **MCP**  | 🔸 **Minibridge** | 📦 **ARC (Acuvity Containers)** |
+| ------------------------------ | ----------- | ----------------- | ------------------------------- |
+| 🌐 Remote Access               | ⚠️          | ✅                | ✅                              |
+| 🔒 TLS Support                 | ❌          | ✅                | ✅                              |
+| 📃 Tool integrity check        | ❌          | ✅                | ✅                              |
+| 📊 Visualization and Tracing   | ❌          | ✅                | ✅                              |
+| 🛡️ Isolation                   | ❌          | ⚠️                | ✅                              |
+| 🔐 Security Policy Management  | ❌          | 👤                | ⚠️                              |
+| 🕵️ Secrets Redaction           | ❌          | 👤                | ⚠️                              |
+| 🔑 Authorization Controls      | ❌          | 👤                | 👤                              |
+| 🧑‍💻 PII Detection and Redaction | ❌          | 👤                | 👤                              |
+| 📌 Version Pinning             | ❌          | ❌                | ✅                              |
 
 ✅ _Included_ | ⚠️ _Partial/Basic Support_ | 👤 _Custom User Implementation_ | ❌ _Not Supported_
 
