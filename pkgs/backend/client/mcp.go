@@ -77,79 +77,48 @@ func (s *MCPStream) Roundtrip(ctx context.Context, call api.MCPCall) (api.MCPCal
 	if err := s.Send(call); err != nil {
 		return api.MCPCall{}, fmt.Errorf("unable to send request: %w", err)
 	}
-
 	resp, err := s.Read(ctx)
 	if err != nil {
-		return api.MCPCall{}, fmt.Errorf("unable to read request: %w", err)
+		return api.MCPCall{}, fmt.Errorf("unable to read response: %w", err)
 	}
 
 	return resp, nil
 }
 
-func (s *MCPStream) PRoundtrip(ctx context.Context, call api.MCPCall) ([]api.MCPCall, error) {
+func (s *MCPStream) PRoundtrip(ctx context.Context, call api.MCPCall) (out []api.MCPCall, err error) {
 
-	respCh := make(chan api.MCPCall)
-	errCh := make(chan error)
+	var resp api.MCPCall
 
-	out := []api.MCPCall{}
-	origID := call.ID
-
-	go func() {
-
-		var cursor string
-		for i := 0; ; i++ {
-
-			if cursor != "" {
-				if call.Params == nil {
-					call.Params = map[string]any{}
-				}
-
-				call.Params["cursor"] = cursor
-			}
-
-			if i > 0 {
-				if id, ok := origID.(int); ok {
-					id += i
-					call.ID = id
-				} else if _, ok := origID.(string); ok {
-					call.ID = fmt.Sprintf("%s-%d", origID, i)
-				}
-			}
-
-			if err := s.Send(call); err != nil {
-				errCh <- fmt.Errorf("unable to send request: %w", err)
-			}
-
-			resp, err := s.Read(ctx)
-			if err != nil {
-				errCh <- fmt.Errorf("unable to read request: %w", err)
-			}
-
-			ncursor, ok := resp.Result["nextCursor"].(string)
-			if ok && ncursor != "" {
-				cursor = ncursor
-			}
-
-			respCh <- resp
-
-			if ncursor == "" {
-				close(respCh)
-				break
-			}
-		}
-	}()
+	if err := s.Send(call); err != nil {
+		return nil, fmt.Errorf("unable to send paginated request: %w", err)
+	}
 
 	for {
-		select {
-		case resp, ok := <-respCh:
-			if !ok {
-				return out, nil
+		for {
+			if resp, err = s.Read(ctx); err != nil {
+				return nil, fmt.Errorf("unable to read paginated response: %w", err)
 			}
+
+			if resp.ID != call.ID {
+				continue
+			}
+
 			out = append(out, resp)
-		case err := <-errCh:
-			return nil, err
-		case <-ctx.Done():
-			return nil, ctx.Err()
+			break
+		}
+
+		cursor, ok := resp.Result["nextCursor"].(string)
+		if !ok || cursor == "" {
+			return out, nil
+		}
+
+		ncall := api.NewMCPCall("")
+		ncall.ID = call.ID
+		ncall.Method = call.Method
+		ncall.Params = map[string]any{"cursor": cursor}
+
+		if err = s.Send(ncall); err != nil {
+			return nil, fmt.Errorf("unable to send next paginated request: %w", err)
 		}
 	}
 }
