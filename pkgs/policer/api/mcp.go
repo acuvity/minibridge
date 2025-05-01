@@ -36,18 +36,22 @@ type MCPCall struct {
 }
 
 // NewMCPCall returns a MCPCall initialized with the given id.
-func NewMCPCall(id int) MCPCall {
+// To initialize a call without ID set, use an empty string.
+func NewMCPCall[T int | string](id T) MCPCall {
 	c := MCPCall{
 		JSONRPC: "2.0",
 	}
 
-	if id >= 0 {
+	var zero T
+	if id != zero {
 		c.ID = id
 	}
 
 	return c
 }
 
+// IDString returns the call ID as a string
+// whatever is the original type.
 func (c *MCPCall) IDString() string {
 
 	if c.ID == nil {
@@ -57,6 +61,7 @@ func (c *MCPCall) IDString() string {
 	return fmt.Sprintf("%s", c.ID)
 }
 
+// NewInitCall makes a new init call using the given protocol version.
 func NewInitCall(proto ProtocolVersion) MCPCall {
 	return MCPCall{
 		JSONRPC: "2.0",
