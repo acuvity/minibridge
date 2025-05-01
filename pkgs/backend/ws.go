@@ -267,7 +267,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[context.Context], session wsc.Websocket, agent api.Agent, data []byte, rtype api.CallType) (buff []byte, err error) {
 
-	call := api.NewMCPCall(-1)
+	call := api.NewMCPCall("")
 	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
 		var oerr = err
 		call.Error = api.NewMCPError(err)

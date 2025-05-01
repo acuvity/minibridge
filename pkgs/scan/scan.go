@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/gofrs/uuid"
 	"github.com/mitchellh/mapstructure"
 	"go.acuvity.ai/minibridge/pkgs/backend/client"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
@@ -26,7 +27,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream) (Dump, error) {
 		return Dump{}, fmt.Errorf("unable to send mcp request: %w", err)
 	}
 
-	notif := api.NewMCPCall(-1)
+	notif := api.NewMCPCall("")
 	notif.Method = "notifications/initialized"
 	if err := stream.Send(notif); err != nil {
 		return Dump{}, fmt.Errorf("unable to send mcp inititlized notif: %w", err)
@@ -36,7 +37,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream) (Dump, error) {
 
 	// Tools
 
-	toolsReq := api.NewMCPCall(1)
+	toolsReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
 	toolsReq.Method = "tools/list"
 	resps, err := stream.PRoundtrip(ctx, toolsReq)
 	if err != nil {
@@ -58,7 +59,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream) (Dump, error) {
 	}
 
 	// Resources
-	resourcesReq := api.NewMCPCall(2)
+	resourcesReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
 	resourcesReq.Method = "resources/list"
 	resps, err = stream.PRoundtrip(ctx, resourcesReq)
 	if err != nil {
@@ -80,7 +81,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream) (Dump, error) {
 	}
 
 	// Resources Templates
-	resourcesTemplateReq := api.NewMCPCall(3)
+	resourcesTemplateReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
 	resourcesTemplateReq.Method = "resources/templates/list"
 	resps, err = stream.PRoundtrip(ctx, resourcesTemplateReq)
 	if err != nil {
@@ -102,7 +103,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream) (Dump, error) {
 	}
 
 	// Prompts
-	promptsReq := api.NewMCPCall(4)
+	promptsReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
 	promptsReq.Method = "prompts/list"
 	resps, err = stream.PRoundtrip(ctx, promptsReq)
 	if err != nil {
