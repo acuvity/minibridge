@@ -5,16 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"go.acuvity.ai/minibridge/pkgs/backend/client"
 	"go.acuvity.ai/minibridge/pkgs/scan"
 )
+
+var fScan = pflag.NewFlagSet("scan", pflag.ExitOnError)
 
 func init() {
 
 	initSharedFlagSet()
 
+	fScan.DurationP("timeout", "t", 2*time.Minute, "maximum time to allow the scan to run.")
+
+	Scan.Flags().AddFlagSet(fScan)
 	Scan.Flags().AddFlagSet(fBackend)
 }
 
@@ -29,7 +37,15 @@ var Scan = &cobra.Command{
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		ctx, cancel := context.WithCancel(cmd.Context())
+		timeout := viper.GetDuration("timeout")
+		var ctx context.Context
+		var cancel context.CancelFunc
+
+		if timeout > 0 {
+			ctx, cancel = context.WithTimeout(cmd.Context(), timeout)
+		} else {
+			ctx, cancel = context.WithCancel(cmd.Context())
+		}
 		defer cancel()
 
 		var mcpServer client.MCPServer

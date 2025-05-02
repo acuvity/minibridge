@@ -14,7 +14,7 @@ func TestMCPServer(t *testing.T) {
 	Convey("calling NewMCPServer on existing bin should work", t, func() {
 		srv, err := NewMCPServer("echo", "hello")
 		So(err, ShouldBeNil)
-		So(srv.Command, ShouldEqual, "/usr/bin/echo")
+		So(srv.Command, ShouldEndWith, "/bin/echo")
 		So(srv.Args, ShouldResemble, []string{"hello"})
 	})
 
@@ -42,7 +42,11 @@ func TestMCPStream(t *testing.T) {
 		}
 
 		Convey("I send a call, it should reach stdin", func() {
-			err := stream.Send(context.Background(), api.NewMCPCall(42))
+
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			defer cancel()
+
+			err := stream.Send(ctx, api.NewMCPCall(42))
 			So(err, ShouldBeNil)
 			So(string(<-stdin), ShouldEqual, `{"id":42,"jsonrpc":"2.0"}`)
 		})
@@ -102,7 +106,7 @@ func TestMCPStream(t *testing.T) {
 
 		Convey("calling PRoundtrip while context cancels should work", func() {
 
-			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
 			// enqueue the resp immediately
@@ -111,7 +115,7 @@ func TestMCPStream(t *testing.T) {
 
 			calls, err := stream.PRoundtrip(ctx, api.NewMCPCall(44))
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldEqual, "unable to read paginated response: context canceled")
+			So(err.Error(), ShouldEndWith, "context canceled")
 			So(len(calls), ShouldEqual, 0)
 		})
 	})

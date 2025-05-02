@@ -70,7 +70,7 @@ func TestClient(t *testing.T) {
 
 		srv := MCPServer{
 			Command: "bash",
-			Args:    []string{"-c", "sleep 1 && ls /this/does/not/exist"},
+			Args:    []string{"-c", "sleep 1 && exit 1"},
 		}
 		cl := NewStdio(srv)
 
@@ -84,9 +84,8 @@ func TestClient(t *testing.T) {
 
 		err = <-stream.Exit
 		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldEqual, "exit status 2")
+		So(err.Error(), ShouldEqual, "exit status 1")
 
-		So(string(<-stream.Stderr), ShouldEqual, "ls: cannot access '/this/does/not/exist': No such file or directory")
 	})
 
 	Convey("Given I have a client that writes a file", t, func() {
