@@ -29,8 +29,8 @@ func TestMCPStream(t *testing.T) {
 
 	Convey("I have a MCPStream", t, func() {
 
-		stdin := make(chan []byte, 2)
-		stdout := make(chan []byte, 2)
+		stdin := make(chan []byte, 10)
+		stdout := make(chan []byte, 10)
 		stderr := make(chan []byte, 1)
 		errCh := make(chan error, 1)
 
@@ -88,15 +88,15 @@ func TestMCPStream(t *testing.T) {
 			defer cancel()
 
 			// enqueue the resp immediately
-			stdout <- []byte(`{"id":46,"jsonrpc":"2.0","result":{"nextCursor":"1"}}`)
-			stdout <- []byte(`{"id":46,"jsonrpc":"2.0"}`)
+			stdout <- []byte(`{"id":"a","jsonrpc":"2.0","result":{"nextCursor":"1"}}`)
+			stdout <- []byte(`{"id":"a","jsonrpc":"2.0"}`)
 
-			calls, err := stream.PRoundtrip(ctx, api.NewMCPCall(44))
+			calls, err := stream.PRoundtrip(ctx, api.NewMCPCall("a"))
 			So(err, ShouldBeNil)
 			So(len(calls), ShouldEqual, 2)
 
-			So(string(<-stdin), ShouldEqual, `{"id":44,"jsonrpc":"2.0"}`)
-			So(string(<-stdin), ShouldEqual, `{"id":45,"jsonrpc":"2.0","params":{"cursor":"1"}}`)
+			So(string(<-stdin), ShouldEqual, `{"id":"a","jsonrpc":"2.0"}`)
+			So(string(<-stdin), ShouldEqual, `{"id":"a","jsonrpc":"2.0","params":{"cursor":"1"}}`)
 
 		})
 
@@ -111,7 +111,7 @@ func TestMCPStream(t *testing.T) {
 
 			calls, err := stream.PRoundtrip(ctx, api.NewMCPCall(44))
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldEqual, "context canceled")
+			So(err.Error(), ShouldEqual, "unable to read paginated response: context canceled")
 			So(len(calls), ShouldEqual, 0)
 		})
 	})
