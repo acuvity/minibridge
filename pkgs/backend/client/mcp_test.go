@@ -42,7 +42,7 @@ func TestMCPStream(t *testing.T) {
 		}
 
 		Convey("I send a call, it should reach stdin", func() {
-			err := stream.Send(api.NewMCPCall(42))
+			err := stream.Send(context.Background(), api.NewMCPCall(42))
 			So(err, ShouldBeNil)
 			So(string(<-stdin), ShouldEqual, `{"id":42,"jsonrpc":"2.0"}`)
 		})

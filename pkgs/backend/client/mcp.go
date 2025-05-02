@@ -40,14 +40,18 @@ type MCPStream struct {
 }
 
 // Send sends the given api.MCPCall to the Stdin stream.
-func (s *MCPStream) Send(call api.MCPCall) error {
+func (s *MCPStream) Send(ctx context.Context, call api.MCPCall) error {
 
 	data, err := elemental.Encode(elemental.EncodingTypeJSON, call)
 	if err != nil {
 		return fmt.Errorf("unable to encode mcp call: %w", err)
 	}
 
-	s.Stdin <- data
+	select {
+	case s.Stdin <- data:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
 	return nil
 }
@@ -74,7 +78,7 @@ func (s *MCPStream) Read(ctx context.Context) (api.MCPCall, error) {
 
 func (s *MCPStream) Roundtrip(ctx context.Context, call api.MCPCall) (api.MCPCall, error) {
 
-	if err := s.Send(call); err != nil {
+	if err := s.Send(ctx, call); err != nil {
 		return api.MCPCall{}, fmt.Errorf("unable to send request: %w", err)
 	}
 	resp, err := s.Read(ctx)
@@ -89,7 +93,7 @@ func (s *MCPStream) PRoundtrip(ctx context.Context, call api.MCPCall) (out []api
 
 	var resp api.MCPCall
 
-	if err := s.Send(call); err != nil {
+	if err := s.Send(ctx, call); err != nil {
 		return nil, fmt.Errorf("unable to send paginated request: %w", err)
 	}
 
@@ -117,7 +121,7 @@ func (s *MCPStream) PRoundtrip(ctx context.Context, call api.MCPCall) (out []api
 		ncall.Method = call.Method
 		ncall.Params = map[string]any{"cursor": cursor}
 
-		if err = s.Send(ncall); err != nil {
+		if err = s.Send(ctx, ncall); err != nil {
 			return nil, fmt.Errorf("unable to send next paginated request: %w", err)
 		}
 	}
