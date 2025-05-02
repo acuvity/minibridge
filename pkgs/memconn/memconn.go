@@ -48,10 +48,6 @@ func newConn() *Conn {
 	}
 }
 
-func (c *Conn) SetName(name string) {
-	c.name = name
-}
-
 // Attach sets the remote peer. Panics if called more than once.
 func (c *Conn) Attach(peer *Conn) {
 	select {

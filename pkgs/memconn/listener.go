@@ -65,8 +65,9 @@ func (l *Listener) Addr() net.Addr {
 // Note that unlike other Dial methods in different packages, there is no
 // address to supply because the remote side of the connection is always the
 // in-memory listener.
-func (l *Listener) DialContext(ctx context.Context) (net.Conn, error) {
+func (l *Listener) DialContext(ctx context.Context, clientName string) (net.Conn, error) {
 	local := newConn()
+	local.name = clientName
 
 	select {
 	case l.pending <- local:

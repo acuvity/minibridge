@@ -130,7 +130,7 @@ var AIO = &cobra.Command{
 			}
 
 			dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return listener.DialContext(cmd.Context())
+				return listener.DialContext(cmd.Context(), "127.0.0.1:443")
 			}
 
 			if listen != "" {
