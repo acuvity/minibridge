@@ -29,7 +29,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream) (Dump, error) {
 
 	notif := api.NewMCPCall("")
 	notif.Method = "notifications/initialized"
-	if err := stream.Send(notif); err != nil {
+	if err := stream.Send(ctx, notif); err != nil {
 		return Dump{}, fmt.Errorf("unable to send mcp inititlized notif: %w", err)
 	}
 
