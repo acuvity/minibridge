@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"go.acuvity.ai/elemental"
+	"go.acuvity.ai/minibridge/pkgs/auth"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -33,31 +34,33 @@ func makeMCPError(ID any, err error) []byte {
 	return data
 }
 
-func parseBasicAuth(auth string) (password string, ok bool) {
+func parseBasicAuth(authString string) (a *auth.Auth, ok bool) {
 
 	const prefix = "Basic "
 
-	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+	if len(authString) < len(prefix) || !strings.EqualFold(authString[:len(prefix)], prefix) {
 
-		parts := strings.SplitN(auth, " ", 2)
+		parts := strings.SplitN(authString, " ", 2)
 		if len(parts) == 2 {
-			return parts[1], true
+			a = auth.NewBearerAuth(parts[1])
+			return a, true
 		}
-		return "", false
+		return nil, false
 	}
 
-	c, err := base64.StdEncoding.DecodeString(auth[len(prefix):])
+	c, err := base64.StdEncoding.DecodeString(authString[len(prefix):])
 	if err != nil {
-		return "", false
+		return nil, false
 	}
 
 	cs := string(c)
 
-	if _, password, ok = strings.Cut(cs, ":"); !ok {
-		return "", false
+	user, password, ok := strings.Cut(cs, ":")
+	if !ok {
+		return nil, false
 	}
 
-	return password, true
+	return auth.NewBasicAuth(user, password), true
 }
 
 func hErr(w http.ResponseWriter, message string, code int, span trace.Span) {

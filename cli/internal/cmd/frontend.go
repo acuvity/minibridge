@@ -21,7 +21,7 @@ func init() {
 	fFrontend.StringP("backend", "A", "", "URL of the minibridge backend to connect to.")
 	fFrontend.String("endpoint-messages", "/message", "when using HTTP, sets the endpoint to post messages.")
 	fFrontend.String("endpoint-sse", "/sse", "when using HTTP, sets the endpoint to connect to the event stream.")
-	fFrontend.BoolP("agent-token-passthrough", "b", false, "forwards incoming HTTP Authorization header to the minibridge backend as-is.")
+	fAgentAuth.BoolP("agent-token-passthrough", "b", false, "Forwards incoming HTTP Authorization header to the minibridge backend as-is.")
 
 	Frontend.Flags().AddFlagSet(fFrontend)
 	Frontend.Flags().AddFlagSet(fTLSClient)
@@ -46,7 +46,6 @@ var Frontend = &cobra.Command{
 		backendURL := viper.GetString("backend")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
-		agentToken := viper.GetString("agent-token")
 		agentTokenPassthrough := viper.GetBool("agent-token-passthrough")
 
 		if backendURL == "" {
@@ -59,11 +58,9 @@ var Frontend = &cobra.Command{
 			backendURL = backendURL + "/ws"
 		}
 
-		if agentToken != "" || agentTokenPassthrough {
-			slog.Info("Agent authentication configured",
-				"agent-token", agentToken != "",
-				"agent-token-passthrough", agentTokenPassthrough,
-			)
+		auth, err := makeAgentAuth()
+		if err != nil {
+			return fmt.Errorf("unable to build auth: %w", err)
 		}
 
 		clientTLSConfig, err := tlsConfigFromFlags(fTLSClient)
@@ -103,7 +100,7 @@ var Frontend = &cobra.Command{
 			proxy = frontend.NewHTTP(listen, backendURL, serverTLSConfig, clientTLSConfig,
 				frontend.OptHTTPStreamEndpoint(sseEndpoint),
 				frontend.OptHTTPMessageEndpoint(messageEndpoint),
-				frontend.OptHTTPAgentToken(agentToken),
+				frontend.OptHTTPAgentAuth(auth),
 				frontend.OptHTTPAgentTokenPassthrough(agentTokenPassthrough),
 				frontend.OptHTTPCORSPolicy(corsPolicy),
 				frontend.OptHTTPMetricsManager(mm),
@@ -118,7 +115,7 @@ var Frontend = &cobra.Command{
 			)
 
 			proxy = frontend.NewStdio(backendURL, clientTLSConfig,
-				frontend.OptStioAgentToken(agentToken),
+				frontend.OptStioAgentAuth(auth),
 				frontend.OptStdioTracer(tracer),
 			)
 		}

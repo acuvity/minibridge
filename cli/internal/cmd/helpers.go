@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.acuvity.ai/bahamut"
+	"go.acuvity.ai/minibridge/pkgs/auth"
 	"go.acuvity.ai/minibridge/pkgs/backend/client"
 	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.acuvity.ai/minibridge/pkgs/policer"
@@ -139,10 +140,27 @@ func makePolicer() (policer.Policer, bool, error) {
 		httpCA := viper.GetString("policer-http-ca")
 		httpSkip := viper.GetBool("policer-http-insecure-skip-verify")
 		httpURL := viper.GetString("policer-http-url")
-		httpToken := viper.GetString("policer-http-token")
+		httpUser := viper.GetString("policer-http-basic-user")
+		httpPassword := viper.GetString("policer-http-basic-password")
+		httpToken := viper.GetString("policer-http-bearer-token")
 
 		if httpURL == "" {
 			return nil, false, fmt.Errorf("you must set --policer-http-url when using an http policer")
+		}
+
+		if (httpUser != "" && httpPassword == "") || (httpUser == "" && httpPassword != "") {
+			return nil, false, fmt.Errorf("you must set both --policer-http-basic-user and --policer-http-auth-basic-password")
+		}
+
+		if httpUser != "" && httpToken != "" {
+			return nil, false, fmt.Errorf("if you set --policer-http-bearer-token, you can't --policer-http-auth-basic-*")
+		}
+
+		var a *auth.Auth
+		if httpToken != "" {
+			a = auth.NewBearerAuth(httpToken)
+		} else {
+			a = auth.NewBasicAuth(httpUser, httpPassword)
 		}
 
 		var pool *x509.CertPool
@@ -165,9 +183,12 @@ func makePolicer() (policer.Policer, bool, error) {
 			RootCAs:            pool,
 		}
 
-		slog.Info("Policer configured", "type", "http", "url", httpURL, "enforced", pEnforce)
+		slog.Info("Policer configured", "type", "http", "url", httpURL, "enforced", pEnforce, "auth")
+		if a != nil {
+			slog.Info("Policer auth enabled", "type", a.Type(), "user", a.User(), "password", a.Password() != "")
+		}
 
-		return policer.NewHTTP(httpURL, httpToken, tlsConfig), pEnforce, nil
+		return policer.NewHTTP(httpURL, a, tlsConfig), pEnforce, nil
 
 	case "rego":
 
@@ -197,7 +218,33 @@ func makePolicer() (policer.Policer, bool, error) {
 	default:
 		return nil, false, fmt.Errorf("unknown type of policer: %s", pType)
 	}
+}
 
+func makeAgentAuth() (a *auth.Auth, err error) {
+
+	user := viper.GetString("agent-user")
+	pass := viper.GetString("agent-pass")
+	token := viper.GetString("agent-token")
+
+	if (user != "" && pass == "") || (user == "" && pass != "") {
+		return a, fmt.Errorf("you must set both --agent-user --agent-pass")
+	}
+
+	if user != "" && token != "" {
+		return a, fmt.Errorf("if you set --agent-token, you cannot set --agent-user and --agent-pass")
+	}
+
+	if token != "" {
+		a = auth.NewBearerAuth(token)
+	} else if user != "" && pass != "" {
+		a = auth.NewBasicAuth(user, pass)
+	}
+
+	if a != nil {
+		slog.Info("Agent credential configured", "type", a.Type(), "user", a.User(), "password", a.Password() != "")
+	}
+
+	return a, nil
 }
 
 func makeCORSPolicy() *bahamut.CORSPolicy {

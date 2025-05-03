@@ -10,7 +10,7 @@ allow if {
 # verifies the claims from the JWT of the agent.
 claims := x if {
 	[verified, _, x] := io.jwt.decode_verify(
-		input.agent.token,
+		input.agent.password,
 		{
 			"secret": "secret",
 			"iss": "pki.example.com",

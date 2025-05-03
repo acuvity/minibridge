@@ -3,7 +3,6 @@ package frontend
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"go.acuvity.ai/minibridge/pkgs/auth"
 	"go.acuvity.ai/wsc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -19,7 +19,7 @@ import (
 // AgentInfo holds information about the agent
 // who sent an MCPCall.
 type AgentInfo struct {
-	Token       string
+	Auth        *auth.Auth
 	AuthHeaders []string
 	UserAgent   string
 	RemoteAddr  string
@@ -36,13 +36,13 @@ func Connect(
 
 	slog.Debug("New websocket connection",
 		"url", backendURL,
-		"using-token", info.Token != "",
+		"using-auth", info.Auth != nil,
 		"using-headers", len(info.AuthHeaders) > 0,
 		"tls", strings.HasPrefix(backendURL, "wss://"),
 		"tls-config", tlsConfig != nil,
 	)
 
-	if dialer == nil && (info.Token != "" || len(info.AuthHeaders) > 0) && tlsConfig == nil {
+	if dialer == nil && (info.Auth != nil || len(info.AuthHeaders) > 0) && tlsConfig == nil {
 		slog.Warn("Security: connecting to a websocket with crendentials sent over the network in clear-text. Refused. Credentials have been stripped. Request will proceed and will likely fail.")
 	}
 
@@ -61,8 +61,8 @@ func Connect(
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(wsconfig.Headers))
 
 	if tlsConfig != nil || dialer != nil {
-		if info.Token != "" {
-			wsconfig.Headers["Authorization"] = []string{"Basic " + base64.StdEncoding.EncodeToString(fmt.Appendf([]byte{}, "Bearer:%s", info.Token))}
+		if info.Auth != nil {
+			wsconfig.Headers["Authorization"] = []string{info.Auth.Encode()}
 		} else if len(info.AuthHeaders) > 0 {
 			wsconfig.Headers["Authorization"] = info.AuthHeaders
 		}

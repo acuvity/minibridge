@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"go.acuvity.ai/minibridge/pkgs/auth"
 )
 
 func Test_makeMCPError(t *testing.T) {
@@ -44,63 +46,63 @@ func Test_makeMCPError(t *testing.T) {
 
 func Test_parseBasicAuth(t *testing.T) {
 	type args struct {
-		auth string
+		authString string
 	}
 	tests := []struct {
 		name string
 		args func(t *testing.T) args
 
-		want1 string
+		want1 *auth.Auth
 		want2 bool
 	}{
 		{
 			"empty header",
 			func(t *testing.T) args {
 				return args{
-					auth: "",
+					authString: "",
 				}
 			},
-			"",
+			nil,
 			false,
 		},
 		{
 			"bearer",
 			func(t *testing.T) args {
 				return args{
-					auth: "Bearer token",
+					authString: "Bearer token",
 				}
 			},
-			"token",
+			auth.NewBearerAuth("token"),
 			true,
 		},
 		{
 			"basic",
 			func(t *testing.T) args {
 				return args{
-					auth: "Basic dXNlcjpwYXNz",
+					authString: "Basic dXNlcjpwYXNz",
 				}
 			},
-			"pass",
+			auth.NewBasicAuth("user", "pass"),
 			true,
 		},
 		{
 			"invalid basic b64",
 			func(t *testing.T) args {
 				return args{
-					auth: "Basic not-b64",
+					authString: "Basic not-b64",
 				}
 			},
-			"",
+			nil,
 			false,
 		},
 		{
 			"invalid basic decoded",
 			func(t *testing.T) args {
 				return args{
-					auth: "Basic aGVsbG8=",
+					authString: "Basic aGVsbG8=",
 				}
 			},
-			"",
+			nil,
 			false,
 		},
 	}
@@ -109,7 +111,7 @@ func Test_parseBasicAuth(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tArgs := tt.args(t)
 
-			got1, got2 := parseBasicAuth(tArgs.auth)
+			got1, got2 := parseBasicAuth(tArgs.authString)
 
 			if !reflect.DeepEqual(got1, tt.want1) {
 				t.Errorf("parseBasicAuth got1 = %v, want1: %v", got1, tt.want1)

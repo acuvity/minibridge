@@ -38,7 +38,7 @@ def police():
     # with the gen-test-tokens.sh located a the parent folder.
     try:
         claims = jwt.decode(
-            agent["token"],
+            agent["password"],
             "secret",
             algorithms=["HS256"],
             issuer="pki.example.com",

@@ -50,8 +50,11 @@ type Request struct {
 // Agent contains information about the caller of the request.
 type Agent struct {
 
-	// Token is the agent token that as been received by the backend.
-	Token string `json:"token"`
+	// User contains the user from the Auth header.
+	User string `json:"user"`
+
+	// Password contains the password from the Auth header.
+	Password string `json:"password"`
 
 	// RemoteAddr contains the agent's RemoteAddr, as seen by minibridge.
 	RemoteAddr string `json:"remoteAddr"`

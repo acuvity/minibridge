@@ -10,21 +10,22 @@ import (
 	"strings"
 
 	"go.acuvity.ai/elemental"
+	"go.acuvity.ai/minibridge/pkgs/auth"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 )
 
 type Policer struct {
 	endpoint string
-	token    string
+	auth     auth.Auth
 	client   *http.Client
 }
 
 // New returns a new HTTP based Policer.
-func New(endpoint string, token string, tlsConfig *tls.Config) *Policer {
+func New(endpoint string, auth *auth.Auth, tlsConfig *tls.Config) *Policer {
 
 	return &Policer{
 		endpoint: endpoint,
-		token:    token,
+		auth:     *auth,
 		client: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: tlsConfig,
@@ -49,7 +50,7 @@ func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, e
 
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", p.token))
+	req.Header.Add("Authorization", p.auth.Encode())
 
 	resp, err := p.client.Do(req)
 	if err != nil {

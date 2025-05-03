@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"go.acuvity.ai/minibridge/pkgs/auth"
 	"go.acuvity.ai/minibridge/pkgs/internal/cors"
 	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
 	"go.acuvity.ai/wsc"
@@ -125,11 +126,11 @@ func (p *httpFrontend) Start(ctx context.Context) error {
 // Caller MUST release the session when you done using releaseSession.
 func (p *httpFrontend) startSession(ctx context.Context, req *http.Request) (*session, error) {
 
-	token, authHeader := p.getCreds(req)
-	ch := hashCreds(token, authHeader)
+	auth, authHeader := p.getCreds(req)
+	ch := hashCreds(auth, authHeader)
 
 	ws, err := Connect(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, AgentInfo{
-		Token:       token,
+		Auth:        auth,
 		AuthHeaders: authHeader,
 		RemoteAddr:  req.RemoteAddr,
 		UserAgent:   req.UserAgent(),
@@ -367,13 +368,15 @@ func (p *httpFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (p *httpFrontend) getCreds(req *http.Request) (token string, authHeaders []string) {
+func (p *httpFrontend) getCreds(req *http.Request) (auth *auth.Auth, authHeaders []string) {
 
-	if p.cfg.agentTokenPassthrough {
-		authHeaders = req.Header["Authorization"]
-	} else if p.cfg.agentToken != "" {
-		token = p.cfg.agentToken
+	if p.cfg.auth != nil {
+		return p.cfg.auth, nil
 	}
 
-	return token, authHeaders
+	if p.cfg.agentTokenPassthrough {
+		return nil, req.Header["Authorization"]
+	}
+
+	return nil, nil
 }

@@ -54,12 +54,10 @@ var AIO = &cobra.Command{
 		listen := viper.GetString("listen")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
-		agentToken := viper.GetString("agent-token")
 
-		if agentToken != "" {
-			slog.Info("Agent authentication enabled",
-				"token", agentToken != "",
-			)
+		auth, err := makeAgentAuth()
+		if err != nil {
+			return fmt.Errorf("unable to build auth: %w", err)
 		}
 
 		policer, penforce, err := makePolicer()
@@ -138,7 +136,7 @@ var AIO = &cobra.Command{
 				slog.Info("Minibridge frontend configured",
 					"sse", sseEndpoint,
 					"messages", messageEndpoint,
-					"agent-token", agentToken != "",
+					"agent-token", auth != nil,
 					"mode", "http",
 					"server-tls", frontendServerTLSConfig != nil,
 					"server-mtls", mtlsMode(frontendServerTLSConfig),
@@ -149,7 +147,7 @@ var AIO = &cobra.Command{
 					frontend.OptHTTPBackendDialer(dialer),
 					frontend.OptHTTPStreamEndpoint(sseEndpoint),
 					frontend.OptHTTPMessageEndpoint(messageEndpoint),
-					frontend.OptHTTPAgentToken(agentToken),
+					frontend.OptHTTPAgentAuth(auth),
 					frontend.OptHTTPAgentTokenPassthrough(true),
 					frontend.OptHTTPCORSPolicy(corsPolicy),
 					frontend.OptHTTPMetricsManager(mm),
@@ -164,7 +162,7 @@ var AIO = &cobra.Command{
 				proxy = frontend.NewStdio("ws://self/ws", nil,
 					frontend.OptStdioBackendDialer(dialer),
 					frontend.OptStdioRetry(false),
-					frontend.OptStioAgentToken(agentToken),
+					frontend.OptStioAgentAuth(auth),
 					frontend.OptStdioTracer(tracer),
 				)
 			}

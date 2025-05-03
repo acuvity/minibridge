@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 
+	"go.acuvity.ai/minibridge/pkgs/auth"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/policer/internal/http"
 	"go.acuvity.ai/minibridge/pkgs/policer/internal/rego"
@@ -21,6 +22,6 @@ func NewRego(policy string) (Policer, error) {
 }
 
 // NewHTTP returns a new HTTP based Policer
-func NewHTTP(endpoint string, token string, tlsConfig *tls.Config) Policer {
-	return http.New(endpoint, token, tlsConfig)
+func NewHTTP(endpoint string, auth *auth.Auth, tlsConfig *tls.Config) Policer {
+	return http.New(endpoint, auth, tlsConfig)
 }

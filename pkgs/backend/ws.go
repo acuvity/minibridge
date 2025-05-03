@@ -157,7 +157,7 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	agentToken, _ := parseBasicAuth(req.Header.Get("Authorization"))
+	auth, hasAuth := parseBasicAuth(req.Header.Get("Authorization"))
 
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
@@ -188,9 +188,13 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	rb := ringbuffer.New(4096)
 
 	agent := api.Agent{
-		Token:      agentToken,
 		RemoteAddr: req.Header.Get("X-Forwarded-For"),
 		UserAgent:  req.Header.Get("X-Forwarded-UA"),
+	}
+
+	if hasAuth {
+		agent.User = auth.User()
+		agent.Password = auth.Password()
 	}
 
 	cache := ccache.New(ccache.Configure[context.Context]().MaxSize(64))
