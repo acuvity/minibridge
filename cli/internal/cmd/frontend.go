@@ -21,7 +21,7 @@ func init() {
 	fFrontend.StringP("backend", "A", "", "URL of the minibridge backend to connect to.")
 	fFrontend.String("endpoint-messages", "/message", "when using HTTP, sets the endpoint to post messages.")
 	fFrontend.String("endpoint-sse", "/sse", "when using HTTP, sets the endpoint to connect to the event stream.")
-	fAgentAuth.BoolP("agent-token-passthrough", "b", false, "Forwards incoming HTTP Authorization header to the minibridge backend as-is.")
+	fAgentAuth.BoolP("agent-auth-passthrough", "b", false, "Forwards incoming HTTP Authorization header to the minibridge backend as-is.")
 
 	Frontend.Flags().AddFlagSet(fFrontend)
 	Frontend.Flags().AddFlagSet(fTLSClient)
@@ -46,7 +46,7 @@ var Frontend = &cobra.Command{
 		backendURL := viper.GetString("backend")
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
-		agentTokenPassthrough := viper.GetBool("agent-token-passthrough")
+		agentAuthPassthrough := viper.GetBool("agent-auth-passthrough")
 
 		if backendURL == "" {
 			return fmt.Errorf("--backend must be set")
@@ -101,7 +101,7 @@ var Frontend = &cobra.Command{
 				frontend.OptHTTPStreamEndpoint(sseEndpoint),
 				frontend.OptHTTPMessageEndpoint(messageEndpoint),
 				frontend.OptHTTPAgentAuth(auth),
-				frontend.OptHTTPAgentTokenPassthrough(agentTokenPassthrough),
+				frontend.OptHTTPAgentTokenPassthrough(agentAuthPassthrough),
 				frontend.OptHTTPCORSPolicy(corsPolicy),
 				frontend.OptHTTPMetricsManager(mm),
 				frontend.OptHTTPTracer(tracer),
