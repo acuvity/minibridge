@@ -22,6 +22,10 @@ func init() {
 
 	fScan.DurationP("timeout", "t", 2*time.Minute, "maximum time to allow the scan to run.")
 
+	fScan.Bool("exclude-resources", false, "exclude resources from scan")
+	fScan.Bool("exclude-tools", false, "exclude tools from scan")
+	fScan.Bool("exclude-prompts", false, "exclude prompts from scan")
+
 	Scan.Flags().AddFlagSet(fScan)
 	Scan.Flags().AddFlagSet(fBackend)
 }
@@ -38,6 +42,13 @@ var Scan = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		timeout := viper.GetDuration("timeout")
+
+		exclusions := &scan.Exclusions{
+			Prompts:   viper.GetBool("exclude-prompts"),
+			Resources: viper.GetBool("exclude-resources"),
+			Tools:     viper.GetBool("exclude-tools"),
+		}
+
 		var ctx context.Context
 		var cancel context.CancelFunc
 
@@ -66,21 +77,29 @@ var Scan = &cobra.Command{
 			return fmt.Errorf("unable to start MCP server: %w", err)
 		}
 
-		dump, err := scan.DumpAll(ctx, stream)
+		dump, err := scan.DumpAll(ctx, stream, exclusions)
 		if err != nil {
 			return fmt.Errorf("unable to dump tools: %w", err)
 		}
 
 		cancel()
 
-		toolHashes, err := scan.HashTools(dump.Tools)
-		if err != nil {
-			return fmt.Errorf("unable to hash tools: %w", err)
+		var toolHashes scan.Hashes
+
+		if !exclusions.Tools {
+			toolHashes, err = scan.HashTools(dump.Tools)
+			if err != nil {
+				return fmt.Errorf("unable to hash tools: %w", err)
+			}
 		}
 
-		promptHashes, err := scan.HashPrompts(dump.Prompts)
-		if err != nil {
-			return fmt.Errorf("unable to hash prompts: %w", err)
+		var promptHashes scan.Hashes
+
+		if !exclusions.Prompts {
+			promptHashes, err = scan.HashPrompts(dump.Prompts)
+			if err != nil {
+				return fmt.Errorf("unable to hash prompts: %w", err)
+			}
 		}
 
 		sbom := scan.SBOM{

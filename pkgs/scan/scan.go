@@ -20,8 +20,8 @@ type Dump struct {
 	Prompts           api.Prompts           `json:"prompts,omitempty"`
 }
 
-// Dump dumps all the all available tools/resource/prompts from the given client.MCPStream.
-func DumpAll(ctx context.Context, stream *client.MCPStream) (Dump, error) {
+// DumpAll dumps all the all available tools/resource/prompts from the given client.MCPStream.
+func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusions) (Dump, error) {
 
 	if _, err := stream.Roundtrip(ctx, api.NewInitCall(api.ProtocolVersion20250326)); err != nil {
 		return Dump{}, fmt.Errorf("unable to send mcp request: %w", err)
@@ -37,93 +37,99 @@ func DumpAll(ctx context.Context, stream *client.MCPStream) (Dump, error) {
 
 	// Tools
 
-	toolsReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
-	toolsReq.Method = "tools/list"
-	resps, err := stream.PRoundtrip(ctx, toolsReq)
-	if err != nil {
-		return Dump{}, fmt.Errorf("unable to send tools/list mcp request: %w", err)
-	}
-
-	for _, resp := range resps {
-
-		if _, ok := resp.Result["tools"]; !ok {
-			continue
+	if !exclusions.Tools {
+		toolsReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
+		toolsReq.Method = "tools/list"
+		resps, err := stream.PRoundtrip(ctx, toolsReq)
+		if err != nil {
+			return Dump{}, fmt.Errorf("unable to send tools/list mcp request: %w", err)
 		}
 
-		tools := api.Tools{}
-		if err := mapstructure.Decode(resp.Result["tools"], &tools); err != nil {
-			return Dump{}, fmt.Errorf("unable to convert to tools: %w", err)
-		}
+		for _, resp := range resps {
 
-		dump.Tools = append(dump.Tools, tools...)
+			if _, ok := resp.Result["tools"]; !ok {
+				continue
+			}
+
+			tools := api.Tools{}
+			if err := mapstructure.Decode(resp.Result["tools"], &tools); err != nil {
+				return Dump{}, fmt.Errorf("unable to convert to tools: %w", err)
+			}
+
+			dump.Tools = append(dump.Tools, tools...)
+		}
 	}
 
 	// Resources
-	resourcesReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
-	resourcesReq.Method = "resources/list"
-	resps, err = stream.PRoundtrip(ctx, resourcesReq)
-	if err != nil {
-		return Dump{}, fmt.Errorf("unable to send resources/list mcp request: %w", err)
-	}
-
-	for _, resp := range resps {
-
-		if _, ok := resp.Result["resources"]; !ok {
-			continue
+	if !exclusions.Resources {
+		resourcesReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
+		resourcesReq.Method = "resources/list"
+		resps, err := stream.PRoundtrip(ctx, resourcesReq)
+		if err != nil {
+			return Dump{}, fmt.Errorf("unable to send resources/list mcp request: %w", err)
 		}
 
-		resources := api.Resources{}
-		if err := mapstructure.Decode(resp.Result["resources"], &resources); err != nil {
-			return Dump{}, fmt.Errorf("unable to convert to resources: %w", err)
+		for _, resp := range resps {
+
+			if _, ok := resp.Result["resources"]; !ok {
+				continue
+			}
+
+			resources := api.Resources{}
+			if err := mapstructure.Decode(resp.Result["resources"], &resources); err != nil {
+				return Dump{}, fmt.Errorf("unable to convert to resources: %w", err)
+			}
+
+			dump.Resources = append(dump.Resources, resources...)
 		}
 
-		dump.Resources = append(dump.Resources, resources...)
-	}
-
-	// Resources Templates
-	resourcesTemplateReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
-	resourcesTemplateReq.Method = "resources/templates/list"
-	resps, err = stream.PRoundtrip(ctx, resourcesTemplateReq)
-	if err != nil {
-		return Dump{}, fmt.Errorf("unable to send resources/templates/list mcp request: %w", err)
-	}
-
-	for _, resp := range resps {
-
-		if _, ok := resp.Result["resourceTemplates"]; !ok {
-			continue
+		// Resources Templates
+		resourcesTemplateReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
+		resourcesTemplateReq.Method = "resources/templates/list"
+		resps, err = stream.PRoundtrip(ctx, resourcesTemplateReq)
+		if err != nil {
+			return Dump{}, fmt.Errorf("unable to send resources/templates/list mcp request: %w", err)
 		}
 
-		resourceTemplates := api.ResourceTemplates{}
-		if err := mapstructure.Decode(resp.Result["resourceTemplates"], &resourceTemplates); err != nil {
-			return Dump{}, fmt.Errorf("unable to convert to resources templates: %w", err)
+		for _, resp := range resps {
+
+			if _, ok := resp.Result["resourceTemplates"]; !ok {
+				continue
+			}
+
+			resourceTemplates := api.ResourceTemplates{}
+			if err := mapstructure.Decode(resp.Result["resourceTemplates"], &resourceTemplates); err != nil {
+				return Dump{}, fmt.Errorf("unable to convert to resources templates: %w", err)
+			}
+
+			dump.ResourceTemplates = append(dump.ResourceTemplates, resourceTemplates...)
 		}
 
-		dump.ResourceTemplates = append(dump.ResourceTemplates, resourceTemplates...)
 	}
 
 	// Prompts
-	promptsReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
-	promptsReq.Method = "prompts/list"
-	resps, err = stream.PRoundtrip(ctx, promptsReq)
-	if err != nil {
-		return Dump{}, fmt.Errorf("unable to send prompts/list mcp request: %w", err)
-	}
-
-	for _, resp := range resps {
-
-		if _, ok := resp.Result["prompts"]; !ok {
-			continue
+	if !exclusions.Prompts {
+		promptsReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
+		promptsReq.Method = "prompts/list"
+		resps, err := stream.PRoundtrip(ctx, promptsReq)
+		if err != nil {
+			return Dump{}, fmt.Errorf("unable to send prompts/list mcp request: %w", err)
 		}
 
-		prompts := api.Prompts{}
-		if err := mapstructure.Decode(resp.Result["prompts"], &prompts); err != nil {
-			return Dump{}, fmt.Errorf("unable to convert to prompts: %w", err)
+		for _, resp := range resps {
+
+			if _, ok := resp.Result["prompts"]; !ok {
+				continue
+			}
+
+			prompts := api.Prompts{}
+			if err := mapstructure.Decode(resp.Result["prompts"], &prompts); err != nil {
+				return Dump{}, fmt.Errorf("unable to convert to prompts: %w", err)
+			}
+
+			dump.Prompts = append(dump.Prompts, prompts...)
 		}
-
-		dump.Prompts = append(dump.Prompts, prompts...)
 	}
-
 	return dump, nil
 }
 

@@ -7,6 +7,14 @@ import (
 	"go.acuvity.ai/elemental"
 )
 
+// Exclusions contains the resources we
+// want to exclude from scan
+type Exclusions struct {
+	Prompts   bool
+	Resources bool
+	Tools     bool
+}
+
 // SBOM contains a list of hashes for hashable
 // resources.
 type SBOM struct {
