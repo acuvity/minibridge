@@ -33,6 +33,8 @@ type httpFrontend struct {
 	backendURL      string
 	server          *http.Server
 	sessions        map[string]*session
+	listen          string
+	tlsServerConfig *tls.Config
 	tlsClientConfig *tls.Config
 	cfg             httpCfg
 
@@ -53,14 +55,14 @@ func NewHTTP(addr string, backend string, serverTLSConfig *tls.Config, clientTLS
 	p := &httpFrontend{
 		backendURL:      backend,
 		tlsClientConfig: clientTLSConfig,
+		tlsServerConfig: serverTLSConfig,
 		sessions:        map[string]*session{},
+		listen:          addr,
 		cfg:             cfg,
 	}
 
 	p.server = &http.Server{
-		Addr:              addr,
 		Handler:           otelhttp.NewHandler(http.HandlerFunc(p.ServeHTTP), "frontend"),
-		TLSConfig:         serverTLSConfig,
 		ReadHeaderTimeout: time.Second,
 	}
 
@@ -90,24 +92,23 @@ func (p *httpFrontend) Start(ctx context.Context) error {
 		}
 	}
 
+	listener, err := net.Listen("tcp", p.listen)
+	if err != nil {
+		return fmt.Errorf("unable to start listener: %w", err)
+	}
+
+	if p.tlsServerConfig != nil {
+		listener = tls.NewListener(listener, p.tlsServerConfig)
+	}
+
 	go func() {
-		if p.server.TLSConfig == nil {
-			err := p.server.ListenAndServe()
-			if err != nil {
-				if !errors.Is(err, http.ErrServerClosed) {
-					slog.Error("unable to start server", "err", err)
-				}
+		err := p.server.Serve(listener)
+		if err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("unable to start server", "err", err)
 			}
-			errCh <- err
-		} else {
-			err := p.server.ListenAndServeTLS("", "")
-			if err != nil {
-				if !errors.Is(err, http.ErrServerClosed) {
-					slog.Error("unable to start tls server", "err", err)
-				}
-			}
-			errCh <- err
 		}
+		errCh <- err
 	}()
 
 	select {
