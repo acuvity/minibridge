@@ -141,7 +141,7 @@ func makePolicer() (policer.Policer, bool, error) {
 		httpSkip := viper.GetBool("policer-http-insecure-skip-verify")
 		httpURL := viper.GetString("policer-http-url")
 		httpUser := viper.GetString("policer-http-basic-user")
-		httpPassword := viper.GetString("policer-http-basic-password")
+		httpPassword := viper.GetString("policer-http-basic-pass")
 		httpToken := viper.GetString("policer-http-bearer-token")
 
 		if httpURL == "" {
@@ -149,11 +149,11 @@ func makePolicer() (policer.Policer, bool, error) {
 		}
 
 		if (httpUser != "" && httpPassword == "") || (httpUser == "" && httpPassword != "") {
-			return nil, false, fmt.Errorf("you must set both --policer-http-basic-user and --policer-http-auth-basic-password")
+			return nil, false, fmt.Errorf("you must set both --policer-http-basic-user and --policer-http-basic-passw")
 		}
 
 		if httpUser != "" && httpToken != "" {
-			return nil, false, fmt.Errorf("if you set --policer-http-bearer-token, you can't --policer-http-auth-basic-*")
+			return nil, false, fmt.Errorf("if you set --policer-http-bearer-token, you can't --policer-http-basic-*")
 		}
 
 		var a *auth.Auth

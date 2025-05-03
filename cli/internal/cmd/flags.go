@@ -43,7 +43,9 @@ func initSharedFlagSet() {
 	fPolicer.Bool("policer-enforce", true, "enforce policy or only log verdict.")
 	fPolicer.String("policer-rego-policy", "", "path to a rego policy file for the rego policer.")
 	fPolicer.String("policer-http-url", "", "URL of the HTTP policer to POST agent policing requests.")
-	fPolicer.String("policer-http-token", "", "token to use to authenticate against the HTTP policer.")
+	fPolicer.String("policer-http-bearer-token", "", "token to use to authenticate against the HTTP policer using Bearer scheme.")
+	fPolicer.String("policer-http-basic-user", "", "user to use to authenticate against the HTTP policer using Basic scheme.")
+	fPolicer.String("policer-http-basic-pass", "", "password to use to authenticate against the HTTP policer using Basic scheme.")
 	fPolicer.String("policer-http-ca", "", "path to a CA to validate the policer server certificates.")
 	fPolicer.Bool("policer-http-insecure-skip-verify", false, "skip policer's server certificates validation. INSECURE.")
 
