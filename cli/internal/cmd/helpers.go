@@ -36,7 +36,7 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 		MinVersion: tls.VersionTLS13,
 	}
 
-	var certPath, keyPath, keyPass string
+	var certPath, keyPath, keyPass, serverCAPath, clientCAPath string
 	var skipVerify bool
 
 	if flags.Name() == "tlsclient" {
@@ -44,15 +44,15 @@ func tlsConfigFromFlags(flags *pflag.FlagSet) (*tls.Config, error) {
 		keyPath = viper.GetString("tls-client-key")
 		keyPass = viper.GetString("tls-client-key-pass")
 		skipVerify = viper.GetBool("tls-client-insecure-skip-verify")
+		serverCAPath = viper.GetString("tls-client-backend-ca")
 	}
-	serverCAPath := viper.GetString("tls-client-backend-ca")
 
 	if flags.Name() == "tlsserver" {
 		certPath = viper.GetString("tls-server-cert")
 		keyPath = viper.GetString("tls-server-key")
 		keyPass = viper.GetString("tls-server-key-pass")
+		clientCAPath = viper.GetString("tls-server-client-ca")
 	}
-	clientCAPath := viper.GetString("tls-server-client-ca")
 
 	if skipVerify {
 		slog.Warn("Backend certificates validation deactivated. Connection will not be secure")
