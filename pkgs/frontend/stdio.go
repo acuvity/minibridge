@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/user"
@@ -72,9 +71,12 @@ func (p *stdioFrontend) Start(ctx context.Context) error {
 	subctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go p.stdiopump(subctx)
+	errCh := make(chan error, 2)
 
-	return p.wspump(subctx)
+	go func() { errCh <- p.stdiopump(subctx) }()
+	go func() { errCh <- p.wspump(subctx) }()
+
+	return <-errCh
 }
 
 func (p *stdioFrontend) wspump(ctx context.Context) error {
@@ -147,7 +149,7 @@ func (p *stdioFrontend) wspump(ctx context.Context) error {
 	}
 }
 
-func (p *stdioFrontend) stdiopump(ctx context.Context) {
+func (p *stdioFrontend) stdiopump(ctx context.Context) error {
 
 	stdin := bufio.NewReader(os.Stdin)
 
@@ -159,10 +161,8 @@ func (p *stdioFrontend) stdiopump(ctx context.Context) {
 			buf, err := stdin.ReadBytes('\n')
 
 			if err != nil {
-				if err != io.EOF {
-					slog.Error("Unable to read data from stdin", "err", err)
-				}
-				continue
+				slog.Debug("unable to read stdin", err)
+				return err
 			}
 
 			if len(buf) == 0 {
@@ -172,7 +172,7 @@ func (p *stdioFrontend) stdiopump(ctx context.Context) {
 			p.wsWrite <- sanitize.Data(buf)
 
 		case <-ctx.Done():
-			return
+			return nil
 		}
 	}
 }
