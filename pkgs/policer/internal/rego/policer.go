@@ -3,10 +3,12 @@ package rego
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/open-policy-agent/opa/v1/ast"
 	"github.com/open-policy-agent/opa/v1/rego"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 )
@@ -16,6 +18,8 @@ type Policer struct {
 	queryReasons rego.PreparedEvalQuery
 	queryMCP     rego.PreparedEvalQuery
 }
+
+const RegoRuntimeEnvPrefix = "REGO_POLICY_RUNTIME_"
 
 // New returns a new Rego based Policer.
 func New(policy string) (*Policer, error) {
@@ -28,17 +32,19 @@ func New(policy string) (*Policer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	queryAllow, err := rego.New(rego.Compiler(comp), rego.Query("data.main.allow")).PrepareForEval(ctx)
+	rTerm := makeRegoRuntimeTerm()
+
+	queryAllow, err := rego.New(rego.Compiler(comp), rego.Query("data.main.allow"), rego.Runtime(rTerm)).PrepareForEval(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to prepare rego deny query: %w", err)
 	}
 
-	queryReasons, err := rego.New(rego.Compiler(comp), rego.Query("reasons := data.main.reasons")).PrepareForEval(ctx)
+	queryReasons, err := rego.New(rego.Compiler(comp), rego.Query("reasons := data.main.reasons"), rego.Runtime(rTerm)).PrepareForEval(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to prepare rego deny query: %w", err)
 	}
 
-	queryMCP, err := rego.New(rego.Compiler(comp), rego.Query("mcp := data.main.mcp")).PrepareForEval(ctx)
+	queryMCP, err := rego.New(rego.Compiler(comp), rego.Query("mcp := data.main.mcp"), rego.Runtime(rTerm)).PrepareForEval(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to prepare rego mcp query: %w", err)
 	}
@@ -107,4 +113,26 @@ func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, e
 	mcall.ID = preq.MCP.ID
 
 	return mcall, nil
+}
+
+// makeRegoRuntimeTerm create a rego ast Term
+// to expose prefixed env var to the rego runtime.
+func makeRegoRuntimeTerm() *ast.Term {
+
+	env := ast.NewObject()
+
+	for _, s := range os.Environ() {
+		parts := strings.SplitN(s, "=", 2)
+		if !strings.HasPrefix(parts[0], RegoRuntimeEnvPrefix) {
+			continue
+		}
+		if len(parts) == 2 {
+			env.Insert(ast.StringTerm(strings.ReplaceAll(parts[0], RegoRuntimeEnvPrefix, "")), ast.StringTerm(parts[1]))
+		}
+	}
+
+	obj := ast.NewObject()
+	obj.Insert(ast.StringTerm("env"), ast.NewTerm(env))
+
+	return ast.NewTerm(obj)
 }
