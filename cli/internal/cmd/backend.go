@@ -68,7 +68,10 @@ var Backend = &cobra.Command{
 
 		corsPolicy := makeCORSPolicy()
 
-		clientOpts := makeMCPClientOptions()
+		mcpClient, err := makeMCPClient(args)
+		if err != nil {
+			return fmt.Errorf("unable to create MCP client: %w", err)
+		}
 
 		mm := startHealthServer(cmd.Context())
 
@@ -88,13 +91,12 @@ var Backend = &cobra.Command{
 			"listen", listen,
 		)
 
-		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpServer,
+		proxy := backend.NewWebSocket(listen, backendTLSConfig, mcpClient,
 			backend.OptPolicer(policer),
 			backend.OptPolicerEnforce(penforce),
 			backend.OptDumpStderrOnError(viper.GetString("log-format") != "json"),
 			backend.OptCORSPolicy(corsPolicy),
 			backend.OptSBOM(sbom),
-			backend.OptClientOptions(clientOpts...),
 			backend.OptMetricsManager(mm),
 			backend.OptTracer(tracer),
 		)

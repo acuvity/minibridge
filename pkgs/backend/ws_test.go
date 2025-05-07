@@ -36,8 +36,9 @@ func startBackend(ctx context.Context, opts ...Option) (wsc.Websocket, error) {
 	if err != nil {
 		return nil, err
 	}
+	client := client.NewStdio(srv)
 
-	backend := NewWebSocket(backendListen, nil, srv, opts...)
+	backend := NewWebSocket(backendListen, nil, client, opts...)
 
 	go func() {
 		if err := backend.Start(ctx); err != nil {

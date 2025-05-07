@@ -9,7 +9,12 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestClient(t *testing.T) {
+func TestStdioClient(t *testing.T) {
+
+	Convey("Type is correct", t, func() {
+		cl := NewStdio(MCPServer{})
+		So(cl.Type(), ShouldEqual, "stdio")
+	})
 
 	Convey("Given I have a client cat and I send lots of trailing \n", t, func() {
 
@@ -115,7 +120,7 @@ func TestClient(t *testing.T) {
 			Command: "sh",
 			Args:    []string{"-c", "touch testfile"},
 		}
-		cl := NewStdio(srv, OptUseTempDir(true))
+		cl := NewStdio(srv, OptStdioUseTempDir(true))
 
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()

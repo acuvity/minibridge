@@ -61,5 +61,6 @@ func initSharedFlagSet() {
 	fMCP.Int("mcp-gid", -1, "if greater than -1, use as GID to run the MCP server command.")
 	fMCP.IntSlice("mcp-groups", nil, "additional GIDs to to run the MCP server command.")
 	fMCP.Bool("mcp-use-tempdir", false, "if set, create a new temp execution dir for each MCP server instance.")
-	fMCP.String("mcp-server-name", "", "the name of server.")
+	fMCP.String("mcp-tls-ca", "", "when using SSE, path to a CA to valide MCP server server certificates.")
+	fMCP.Bool("mcp-tls-insecure-skip-verify", false, "skip MCP server certificates validation. INSECURE.")
 }

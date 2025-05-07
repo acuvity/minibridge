@@ -7,7 +7,6 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 	"go.acuvity.ai/bahamut"
-	"go.acuvity.ai/minibridge/pkgs/backend/client"
 	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/scan"
@@ -50,13 +49,6 @@ func TestOptions(t *testing.T) {
 		s := scan.SBOM{}
 		OptSBOM(s)(&cfg)
 		So(cfg.sbom, ShouldEqual, s)
-	})
-
-	Convey("OptClientOtions should work", t, func() {
-		cfg := newWSCfg()
-		opts := []client.Option{client.OptUseTempDir(true)}
-		OptClientOptions(opts...)(&cfg)
-		So(cfg.clientOpts, ShouldResemble, opts)
 	})
 
 	Convey("OptMetricsManager should work", t, func() {

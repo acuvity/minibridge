@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -304,33 +305,6 @@ func makeSBOM() (scan.SBOM, error) {
 	return sbom, nil
 }
 
-func makeMCPClientOptions() []client.Option {
-
-	uid := viper.GetInt("mcp-uid")
-	gid := viper.GetInt("mcp-gid")
-	groups := viper.GetIntSlice("mcp-groups")
-	tmp := viper.GetBool("mcp-use-tempdir")
-
-	opts := []client.Option{
-		client.OptUseTempDir(tmp),
-	}
-
-	if uid > -1 && gid > -1 || len(groups) > 0 {
-		opts = append(opts, client.OptCredentials(uid, gid, groups))
-	}
-
-	if uid > -1 || gid > -1 || len(groups) > 0 || tmp {
-		slog.Info("MCP server isolation",
-			"use-temp", tmp,
-			"uid", uid,
-			"gid", gid,
-			"groups", groups,
-		)
-	}
-
-	return opts
-}
-
 func makeTracer(ctx context.Context, name string) (trace.Tracer, error) {
 
 	var err error
@@ -385,4 +359,91 @@ func makeTracer(ctx context.Context, name string) (trace.Tracer, error) {
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
 	return tp.Tracer(name), nil
+}
+
+func makeMCPClient(args []string) (client.Client, error) {
+
+	ca := viper.GetString("mcp-tls-ca")
+	skip := viper.GetBool("mcp-tls-insecure-skip-verify")
+	uid := viper.GetInt("mcp-uid")
+	gid := viper.GetInt("mcp-gid")
+	groups := viper.GetIntSlice("mcp-groups")
+	tmp := viper.GetBool("mcp-use-tempdir")
+
+	switch {
+
+	// args[0] is an URL, we'll use SSE to connect to the MCP Server
+	case strings.HasPrefix(args[0], "http://") || strings.HasPrefix(args[0], "https://"):
+
+		if uid != -1 || gid != -1 || len(groups) > 0 || tmp {
+			return nil, fmt.Errorf("cannot use --mcp-uid, --mcp-gid, --mcp-groups or --mcp-use-tempdir when using SSE")
+		}
+
+		var tlsConfig *tls.Config
+
+		if ca != "" || skip {
+
+			tlsConfig = &tls.Config{
+				InsecureSkipVerify: skip, // #nosec: G402
+			}
+
+			if ca != "" {
+				data, err := os.ReadFile(ca) // #nosec: G304
+				if err != nil {
+					return nil, fmt.Errorf("unable to read MCP server CA: %w", err)
+				}
+
+				pool := x509.NewCertPool()
+				if !pool.AppendCertsFromPEM(data) {
+					return nil, fmt.Errorf("unable to append MCP server CA to cert pool: %w", err)
+				}
+				tlsConfig.RootCAs = pool
+			}
+		}
+
+		slog.Info("MCP server configured",
+			"mode", "sse",
+			"url", args[0],
+		)
+
+		return client.NewSSE(args[0], tlsConfig), nil
+
+	// args[0] is not an URL so we consider this is a command and we'll use STDIO
+	default:
+
+		if ca != "" || skip {
+			return nil, fmt.Errorf("cannot use --mcp-tls-ca or mcp-tls-insecure-skip-verify when using STDIO")
+		}
+
+		opts := []client.StdioOption{
+			client.OptStdioUseTempDir(tmp),
+		}
+
+		if uid > -1 && gid > -1 || len(groups) > 0 {
+			opts = append(opts, client.OptStdioCredentials(uid, gid, groups))
+		}
+
+		if uid > -1 || gid > -1 || len(groups) > 0 || tmp {
+			slog.Info("MCP server isolation",
+				"use-temp", tmp,
+				"uid", uid,
+				"gid", gid,
+				"groups", groups,
+			)
+		}
+
+		mcpsrv, err := client.NewMCPServer(args[0], args[1:]...)
+		if err != nil {
+			return nil, fmt.Errorf("unable to create mcp server: %w", err)
+		}
+
+		slog.Info("MCP server configured",
+			"mode", "stdio",
+			"command", mcpsrv.Command,
+			"args", mcpsrv.Args,
+		)
+
+		return client.NewStdio(mcpsrv, opts...), nil
+	}
+
 }

@@ -15,13 +15,13 @@ import (
 
 type stdioClient struct {
 	srv MCPServer
-	cfg cfg
+	cfg stdioCfg
 }
 
 // NewStdio returns a Client communicating through stdio.
-func NewStdio(srv MCPServer, options ...Option) Client {
+func NewStdio(srv MCPServer, options ...StdioOption) Client {
 
-	cfg := newCfg()
+	cfg := newStdioCfg()
 	for _, o := range options {
 		o(&cfg)
 	}
@@ -30,6 +30,10 @@ func NewStdio(srv MCPServer, options ...Option) Client {
 		srv: srv,
 		cfg: cfg,
 	}
+}
+
+func (c *stdioClient) Type() string {
+	return "stdio"
 }
 
 func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {

@@ -153,6 +153,7 @@ func (s *Session) start() {
 				s.setDeadline(time.Now().Add(s.nextDeadline))
 
 			case err := <-s.ws.Done():
+				s.release()
 				s.closeCh <- err
 				return
 

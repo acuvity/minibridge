@@ -11,30 +11,30 @@ type creds struct {
 	Groups []uint32
 }
 
-type cfg struct {
+type stdioCfg struct {
 	useTempDir bool
 	creds      *creds
 }
 
-func newCfg() cfg {
-	return cfg{}
+func newStdioCfg() stdioCfg {
+	return stdioCfg{}
 }
 
-// An Option can be passed to the Client.
-type Option func(*cfg)
+// An StdioOption can be passed to the Client.
+type StdioOption func(*stdioCfg)
 
-// OptUseTempDir defines if the the client should
+// OptStdioUseTempDir defines if the the client should
 // run the command into it's own working dir. If false,
 // the command will run in minibridge current cwd
-func OptUseTempDir(use bool) Option {
-	return func(c *cfg) {
+func OptStdioUseTempDir(use bool) StdioOption {
+	return func(c *stdioCfg) {
 		c.useTempDir = use
 	}
 }
 
-// OptCredentials sets the uid and gid to run the command as.
-func OptCredentials(uid int, gid int, groups []int) Option {
-	return func(c *cfg) {
+// OptStdioCredentials sets the uid and gid to run the command as.
+func OptStdioCredentials(uid int, gid int, groups []int) StdioOption {
+	return func(c *stdioCfg) {
 
 		grps := make([]uint32, 0, len(groups))
 

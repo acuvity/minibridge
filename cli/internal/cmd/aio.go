@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.acuvity.ai/minibridge/pkgs/backend"
-	"go.acuvity.ai/minibridge/pkgs/backend/client"
 	"go.acuvity.ai/minibridge/pkgs/frontend"
 	"go.acuvity.ai/minibridge/pkgs/memconn"
 	"golang.org/x/sync/errgroup"
@@ -79,7 +78,10 @@ var AIO = &cobra.Command{
 
 		corsPolicy := makeCORSPolicy()
 
-		clientOpts := makeMCPClientOptions()
+		mcpClient, err := makeMCPClient(args)
+		if err != nil {
+			return fmt.Errorf("unable to create MCP client: %w", err)
+		}
 
 		mm := startHealthServer(ctx)
 
@@ -92,25 +94,14 @@ var AIO = &cobra.Command{
 
 			defer cancel()
 
-			mcpServer, err := client.NewMCPServer(args[0], args[1:]...)
-			if err != nil {
-				return fmt.Errorf("unable to create mcp server: %w", err)
-			}
-
-			slog.Info("MCP server configured",
-				"command", mcpServer.Command,
-				"args", mcpServer.Args,
-			)
-
 			slog.Info("Minibridge backend configured")
 
-			proxy := backend.NewWebSocket("self", nil, mcpServer,
+			proxy := backend.NewWebSocket("self", nil, mcpClient,
 				backend.OptListener(listener),
 				backend.OptPolicer(policer),
 				backend.OptPolicerEnforce(penforce),
 				backend.OptDumpStderrOnError(viper.GetString("log-format") != "json"),
 				backend.OptSBOM(sbom),
-				backend.OptClientOptions(clientOpts...),
 				backend.OptMetricsManager(mm),
 				backend.OptTracer(tracer),
 			)

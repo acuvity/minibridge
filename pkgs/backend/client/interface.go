@@ -6,4 +6,5 @@ import "context"
 // act as a minibridge mcp Client.
 type Client interface {
 	Start(context.Context) (*MCPStream, error)
+	Type() string
 }

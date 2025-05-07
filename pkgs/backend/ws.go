@@ -33,8 +33,8 @@ import (
 
 type wsBackend struct {
 	cfg       wsCfg
-	mcpServer client.MCPServer
 	server    *http.Server
+	client    client.Client
 	listen    string
 	tlsConfig *tls.Config
 }
@@ -42,7 +42,7 @@ type wsBackend struct {
 // NewWebSocket retrurns a new backend.Backend exposing a Websocket to communicate
 // with the given mcp.Server. It will use the given *tls.Config for everything TLS.
 // It tls.Config is nil, the server will run as plain HTTP.
-func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServer, opts ...Option) Backend {
+func NewWebSocket(listen string, tlsConfig *tls.Config, client client.Client, opts ...Option) Backend {
 
 	cfg := newWSCfg()
 	for _, o := range opts {
@@ -50,7 +50,7 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, mcpServer client.MCPServ
 	}
 
 	p := &wsBackend{
-		mcpServer: mcpServer,
+		client:    client,
 		cfg:       cfg,
 		listen:    listen,
 		tlsConfig: tlsConfig,
@@ -140,9 +140,9 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	stream, err := client.NewStdio(p.mcpServer, p.cfg.clientOpts...).Start(ctx)
+	stream, err := p.client.Start(ctx)
 	if err != nil {
-		slog.Error("Unable to start mcp client", err)
+		slog.Error("Unable to start mcp client", "type", p.client.Type(), err)
 		hErr(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError, span)
 		m(http.StatusInternalServerError)
 		return

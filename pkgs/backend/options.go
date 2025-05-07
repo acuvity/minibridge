@@ -4,7 +4,6 @@ import (
 	"net"
 
 	"go.acuvity.ai/bahamut"
-	"go.acuvity.ai/minibridge/pkgs/backend/client"
 	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/scan"
@@ -13,7 +12,6 @@ import (
 )
 
 type wsCfg struct {
-	clientOpts      []client.Option
 	corsPolicy      *bahamut.CORSPolicy
 	dumpStderr      bool
 	listener        net.Listener
@@ -70,13 +68,6 @@ func OptCORSPolicy(policy *bahamut.CORSPolicy) Option {
 func OptSBOM(sbom scan.SBOM) Option {
 	return func(cfg *wsCfg) {
 		cfg.sbom = sbom
-	}
-}
-
-// OptClientOptions sets the option to pass to the spawned clients
-func OptClientOptions(opts ...client.Option) Option {
-	return func(cfg *wsCfg) {
-		cfg.clientOpts = opts
 	}
 }
 
