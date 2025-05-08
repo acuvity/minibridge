@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.acuvity.ai/minibridge/pkgs/backend"
-	"go.acuvity.ai/minibridge/pkgs/backend/client"
 )
 
 var fBackend = pflag.NewFlagSet("backend", pflag.ExitOnError)
@@ -74,16 +73,6 @@ var Backend = &cobra.Command{
 		}
 
 		mm := startHealthServer(cmd.Context())
-
-		mcpServer, err := client.NewMCPServer(args[0], args[1:]...)
-		if err != nil {
-			return err
-		}
-
-		slog.Info("MCP server configured",
-			"command", mcpServer.Command,
-			"args", mcpServer.Args,
-		)
 
 		slog.Info("Minibridge backend configured",
 			"server-tls", backendTLSConfig != nil,
