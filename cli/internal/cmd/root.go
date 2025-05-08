@@ -17,6 +17,7 @@ func init() {
 
 	Root.PersistentFlags().String("log-level", "info", "sets the log level.")
 	Root.PersistentFlags().String("log-format", "console", "sets the log format.")
+	Root.PersistentFlags().Bool("version", false, "print version and exit.")
 
 	Root.AddCommand(
 		Backend,
@@ -52,7 +53,7 @@ var Root = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if viper.GetBool("version") {
-			fmt.Println(version.String("minibridge"))
+			fmt.Println(version.Short())
 			os.Exit(0)
 		}
 		return cmd.Usage()
