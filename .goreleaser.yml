@@ -5,26 +5,54 @@ changelog:
   sort: asc
   filters:
     exclude:
-    - '^docs:'
-    - '^test:'
-    - '^examples:'
+      - "^docs:"
+      - "^test:"
+      - "^examples:"
 builds:
   - id: minibridge
     binary: minibridge
     goos:
-    - linux
-    - darwin
+      - linux
+      - darwin
     goarch:
-    - amd64
+      - amd64
+      - arm64
     env:
-    - CGO_ENABLED=0
+      - CGO_ENABLED=0
+    ldflags:
+      - -w -s -X 'go.acuvity.ai/a3s/pkgs/version.GitSha={{.Commit}}' -X 'go.acuvity.ai/a3s/pkgs/version.GitBranch=main' -X 'go.acuvity.ai/a3s/pkgs/version.GitTag={{.Version}}' -X 'go.acuvity.ai/a3s/pkgs/version.BuildDate={{.Date}}'
 
 archives:
   - id: minibridge
-    formats: ['binary']
+    formats: ["binary"]
     builds:
-    - minibridge
+      - minibridge
 
 signs:
   - artifacts: checksum
-    args: ["-u", "0C3214A61024881F5CA1F5F056EDB08A11DCE325", "--output", "${signature}", "--detach-sign", "${artifact}"]
+    args:
+      [
+        "-u",
+        "0C3214A61024881F5CA1F5F056EDB08A11DCE325",
+        "--output",
+        "${signature}",
+        "--detach-sign",
+        "${artifact}",
+      ]
+
+brews:
+  - name: minibridge
+    homepage: "https://github.com/acuvity/minibridge"
+    description: Minibridge securely connects Agents to MCP servers, exposing them to the internet while enabling optional integration with remote or local Policers for authentication, analysis, and transformation."
+    license: "Apache"
+    repository:
+      owner: acuvity
+      name: homebrew-tools
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@acuvity.ai
+    directory: Formula
+    install: |
+      bin.install "minibridge"
+    test: |
+      system "#{bin}/minibridge", "--version"
