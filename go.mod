@@ -20,6 +20,7 @@ require (
 	github.com/karlseguin/ccache/v3 v3.0.6
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/open-policy-agent/opa v1.4.0
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/prometheus/client_golang v1.22.0
 	github.com/smallnest/ringbuffer v0.0.0-20250317021400-0da97b586904
 	github.com/smartystreets/goconvey v1.8.1

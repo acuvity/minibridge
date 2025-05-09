@@ -64,6 +64,20 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, client client.Client, op
 	return p
 }
 
+func (p *wsBackend) BaseURL() string {
+
+	scheme := "http"
+	if p.tlsConfig != nil {
+		scheme = "https"
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, p.listen)
+}
+
+func (p *wsBackend) Client() *http.Client {
+	panic("not implemented")
+}
+
 // Start starts the server and will block until the given
 // context is canceled.
 func (p *wsBackend) Start(ctx context.Context) (err error) {
@@ -141,6 +155,9 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	case "/oauth2/token":
 		defer handleOAuth(p.client, w, req, "/token")()
+
+	default:
+		w.WriteHeader(http.StatusNotFound)
 	}
 }
 

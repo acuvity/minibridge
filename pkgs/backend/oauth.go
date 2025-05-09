@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-type oauther interface {
+type OAuth2Provider interface {
 	BaseURL() string
 	Client() *http.Client
 }
 
 func handleOAuth(c any, w http.ResponseWriter, req *http.Request, path string) func() {
 
-	cl, ok := c.(oauther)
+	cl, ok := c.(OAuth2Provider)
 	if !ok {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return func() {}
@@ -25,7 +25,7 @@ func handleOAuth(c any, w http.ResponseWriter, req *http.Request, path string) f
 
 	slog.Info("Forwarding OAuth2 call", "method", req.Method, "target", u)
 
-	breq, err := http.NewRequestWithContext(req.Context(), req.Method, u, nil)
+	breq, err := http.NewRequestWithContext(req.Context(), req.Method, u, req.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to make request: %s", err), http.StatusInternalServerError)
 		return func() {}
@@ -56,7 +56,11 @@ func handleOAuth(c any, w http.ResponseWriter, req *http.Request, path string) f
 	}
 
 	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, resp.Body)
 
-	return func() { _ = resp.Body.Close() }
+	if resp.Body != nil {
+		_, _ = io.Copy(w, resp.Body)
+		return func() { _ = resp.Body.Close() }
+	}
+
+	return func() {}
 }
