@@ -19,8 +19,10 @@ import (
 	"github.com/smallnest/ringbuffer"
 	"go.acuvity.ai/elemental"
 	"go.acuvity.ai/minibridge/pkgs/backend/client"
+	"go.acuvity.ai/minibridge/pkgs/info"
 	"go.acuvity.ai/minibridge/pkgs/internal/cors"
 	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
+	"go.acuvity.ai/minibridge/pkgs/oauth"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/scan"
 	"go.acuvity.ai/wsc"
@@ -30,6 +32,8 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
+
+var _ Backend = (*wsBackend)(nil)
 
 type wsBackend struct {
 	cfg       wsCfg
@@ -125,6 +129,95 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	switch req.URL.Path {
+
+	case "/ws":
+		p.handleWS(w, req)
+		return
+
+	case "/_info":
+		p.handleInfo(w, req)
+		return
+	}
+
+	if r, ok := p.client.(client.RemoteClient); ok {
+
+		switch req.URL.Path {
+
+		case "/oauth2/.well-known/oauth-authorization-server":
+			defer oauth.Forward(r.BaseURL(), r.HTTPClient(), w, req, "/.well-known/oauth-authorization-server")()
+			return
+
+		case "/oauth2/register":
+			defer oauth.Forward(r.BaseURL(), r.HTTPClient(), w, req, "/register")()
+			return
+
+		case "/oauth2/authorize":
+			defer oauth.Forward(r.BaseURL(), r.HTTPClient(), w, req, "/authorize")()
+			return
+
+		case "/oauth2/token":
+			defer oauth.Forward(r.BaseURL(), r.HTTPClient(), w, req, "/token")()
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusNotFound)
+}
+
+func (p *wsBackend) handleInfo(w http.ResponseWriter, req *http.Request) {
+
+	if req.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	inf := info.Info{
+		Type:   p.client.Type(),
+		Server: p.client.Server(),
+	}
+
+	if oclient, ok := p.client.(client.RemoteClient); ok {
+
+		cl := oclient.HTTPClient()
+
+		resp, err := cl.Get(fmt.Sprintf("%s/.well-known/oauth-authorization-server", oclient.BaseURL()))
+		if err == nil && resp.StatusCode != http.StatusNotFound {
+			inf.OAuthMetadata = true
+		}
+		_ = resp.Body.Close()
+
+		resp, err = cl.Get(fmt.Sprintf("%s/authorize", oclient.BaseURL()))
+		if err == nil && resp.StatusCode != http.StatusNotFound {
+			inf.OAuthAuthorize = true
+		}
+		_ = resp.Body.Close()
+
+		resp, err = cl.Get(fmt.Sprintf("%s/register", oclient.BaseURL()))
+		if err == nil && resp.StatusCode != http.StatusNotFound {
+			inf.OAuthRegister = true
+		}
+		_ = resp.Body.Close()
+
+		resp, err = cl.Get(fmt.Sprintf("%s/token", oclient.BaseURL()))
+		if err == nil && resp.StatusCode != http.StatusNotFound {
+			inf.OAuthToken = true
+		}
+		_ = resp.Body.Close()
+	}
+
+	data, err := elemental.Encode(elemental.EncodingTypeJSON, inf)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to encode info: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+func (p *wsBackend) handleWS(w http.ResponseWriter, req *http.Request) {
+
 	ctx, span := p.cfg.tracer.Start(req.Context(), "backend")
 	defer span.End()
 
@@ -135,13 +228,22 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		defer mm.UnregisterWSConnection()
 	}
 
-	if req.Method != http.MethodGet || req.URL.Path != "/ws" {
-		hErr(w, "only supports GET /ws", http.StatusBadRequest, span)
+	if req.Method != http.MethodGet {
+		hErr(w, "only supports GET /ws", http.StatusMethodNotAllowed, span)
 		return
 	}
 
-	stream, err := p.client.Start(ctx)
+	auth, hasAuth := parseBasicAuth(req.Header.Get("Authorization"))
+
+	stream, err := p.client.Start(ctx, client.OptionAuth(auth))
 	if err != nil {
+
+		if errors.Is(err, client.ErrAuthRequired) {
+			hErr(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusUnauthorized, span)
+			m(http.StatusUnauthorized)
+			return
+		}
+
 		slog.Error("Unable to start mcp client", "type", p.client.Type(), err)
 		hErr(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError, span)
 		m(http.StatusInternalServerError)
@@ -156,8 +258,6 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		m(http.StatusInternalServerError)
 		return
 	}
-
-	auth, hasAuth := parseBasicAuth(req.Header.Get("Authorization"))
 
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
@@ -255,7 +355,10 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			return
 
 		case err := <-ws.Done():
-			if err != nil && !strings.HasSuffix(err.Error(), "websocket: close 1001 (going away)") {
+			if err != nil &&
+				!strings.HasSuffix(err.Error(), "websocket: close 1001 (going away)") &&
+				!strings.HasSuffix(err.Error(), "websocket: close 1000 (normal)") &&
+				!strings.HasSuffix(err.Error(), "websocket: close 1006 (abnormal closure): unexpected EOF") {
 				slog.Error("Backend websocket has closed", err)
 			} else {
 				slog.Debug("Backend websocket has closed")

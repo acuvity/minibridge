@@ -13,6 +13,8 @@ import (
 	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
 )
 
+var _ Client = (*stdioClient)(nil)
+
 type stdioClient struct {
 	srv MCPServer
 	cfg stdioCfg
@@ -36,7 +38,9 @@ func (c *stdioClient) Type() string {
 	return "stdio"
 }
 
-func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {
+func (c *stdioClient) Server() string { return c.srv.Command }
+
+func (c *stdioClient) Start(ctx context.Context, _ ...Option) (pipe *MCPStream, err error) {
 
 	dir, err := os.Getwd()
 	if err != nil {

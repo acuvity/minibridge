@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,10 +13,13 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/zalando/go-keyring"
 	"go.acuvity.ai/bahamut"
 	"go.acuvity.ai/minibridge/pkgs/auth"
 	"go.acuvity.ai/minibridge/pkgs/backend/client"
+	"go.acuvity.ai/minibridge/pkgs/frontend"
 	"go.acuvity.ai/minibridge/pkgs/metrics"
+	"go.acuvity.ai/minibridge/pkgs/oauth"
 	"go.acuvity.ai/minibridge/pkgs/policer"
 	"go.acuvity.ai/minibridge/pkgs/scan"
 	"go.acuvity.ai/tg/tglib"
@@ -266,10 +270,15 @@ func makeCORSPolicy() *bahamut.CORSPolicy {
 			"Content-Type",
 			"Cache-Control",
 			"Cookie",
+			"Mcp-Protocol-Version",
+		},
+		ExposeHeaders: []string{
+			"Mcp-Session-Id",
 		},
 		AllowMethods: []string{
 			"GET",
 			"POST",
+			"DELETE",
 			"OPTIONS",
 		},
 	}
@@ -446,4 +455,77 @@ func makeMCPClient(args []string) (client.Client, error) {
 		return client.NewStdio(mcpsrv, opts...), nil
 	}
 
+}
+
+func startFrontendWithOAuth(ctx context.Context, mfrontend frontend.Frontend, agentAuth *auth.Auth) error {
+
+	hasCustomAgentAuth := agentAuth != nil
+
+	inf, err := mfrontend.BackendInfo()
+	if err != nil {
+		return fmt.Errorf("unable to retrieve backend info: %w", err)
+	}
+
+	slog.Debug("Backend info retrieved",
+		"oauth-metadata", inf.OAuthMetadata,
+		"oauth-authorize", inf.OAuthAuthorize,
+		"oauth-register", inf.OAuthRegister,
+		"oauth-token", inf.OAuthToken,
+		"type", inf.Type,
+		"server", inf.Server,
+	)
+
+	var ocreds oauth.Credentials
+
+	if !hasCustomAgentAuth {
+
+		if ocreds, err = oauth.TokenFromKeyring(inf.Server); err != nil && !errors.Is(err, keyring.ErrNotFound) {
+			return fmt.Errorf("unable to oauth token from OS keyring: %w", err)
+		}
+
+		if ocreds.AccessToken != "" {
+			slog.Debug("MCP Server auth token retrieved from OS keyring")
+			agentAuth = auth.NewOAuthAuth(ocreds)
+		}
+	}
+
+	tryN, maxTry := 0, 3
+
+	for {
+
+		var creds oauth.Credentials
+
+		if ocreds.RefreshToken != "" {
+			if creds, err = oauth.Refresh(ctx, mfrontend.BackendURL(), mfrontend.HTTPClient(), inf, ocreds); err != nil {
+				slog.Warn("Unable to refresh oauth token", err)
+			} else {
+				slog.Info("OAuth: Successfully refreshed credentials")
+				agentAuth = auth.NewBearerAuth(creds.AccessToken)
+				if err := oauth.TokenToKeyring(inf.Server, creds); err != nil {
+					return fmt.Errorf("unable to store oauth token to OS keyring: %w", err)
+				}
+			}
+		}
+
+		if err = mfrontend.Start(ctx, agentAuth); err == nil {
+			return nil
+		}
+
+		if !errors.Is(err, frontend.ErrAuthRequired) || !inf.OAuthAuthorize || hasCustomAgentAuth || tryN > maxTry {
+			slog.Error("Unable to start frontend", err)
+			return err
+		}
+
+		slog.Info("OAuth: Asking for new credentials")
+		if creds, err = oauth.Dance(ctx, mfrontend.BackendURL(), mfrontend.HTTPClient(), inf); err != nil {
+			return fmt.Errorf("unable to perform oauth dance: %w", err)
+		}
+
+		agentAuth = auth.NewOAuthAuth(creds)
+		if err := oauth.TokenToKeyring(inf.Server, creds); err != nil {
+			return fmt.Errorf("unable to store oauth token to OS keyring: %w", err)
+		}
+
+		tryN++
+	}
 }

@@ -19,6 +19,8 @@ func HandleCORS(w http.ResponseWriter, req *http.Request, corsPolicy *bahamut.CO
 		return true
 	}
 
+	w.Header().Del("Origin")
+
 	if req.Method == http.MethodOptions {
 		corsPolicy.Inject(w.Header(), req.Header.Get("Origin"), true)
 		w.WriteHeader(http.StatusNoContent)

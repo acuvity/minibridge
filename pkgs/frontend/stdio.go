@@ -6,20 +6,28 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"os"
 	"os/user"
 	"time"
 
+	"go.acuvity.ai/minibridge/pkgs/auth"
+	"go.acuvity.ai/minibridge/pkgs/info"
 	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
 )
 
+var _ Frontend = (*stdioFrontend)(nil)
+
 type stdioFrontend struct {
-	backendURL string
-	tlsConfig  *tls.Config
-	cfg        stdioCfg
-	wsWrite    chan []byte
-	user       string
-	claims     []string
+	u               *url.URL
+	agentAuth       *auth.Auth
+	backendURL      string
+	cfg             stdioCfg
+	claims          []string
+	tlsClientConfig *tls.Config
+	user            string
+	wsWrite         chan []byte
 }
 
 // NewStdio returns a new *StdioProxy that will connect to the given
@@ -35,17 +43,25 @@ func NewStdio(backend string, tlsConfig *tls.Config, opts ...OptStdio) Frontend 
 		o(&cfg)
 	}
 
+	u, err := url.Parse(backend)
+	if err != nil {
+		panic(err)
+	}
+
 	return &stdioFrontend{
-		backendURL: backend,
-		tlsConfig:  tlsConfig,
-		wsWrite:    make(chan []byte),
-		cfg:        cfg,
+		u:               u,
+		backendURL:      backend,
+		tlsClientConfig: tlsConfig,
+		wsWrite:         make(chan []byte),
+		cfg:             cfg,
 	}
 }
 
 // Start starts the proxy. It will run until the given context is canceled or until
 // the server returns an error.
-func (p *stdioFrontend) Start(ctx context.Context) error {
+func (p *stdioFrontend) Start(ctx context.Context, agentAuth *auth.Auth) error {
+
+	p.agentAuth = agentAuth
 
 	user, err := user.Current()
 	if err != nil {
@@ -79,6 +95,29 @@ func (p *stdioFrontend) Start(ctx context.Context) error {
 	return <-errCh
 }
 
+func (p *stdioFrontend) HTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: p.tlsClientConfig,
+			DialContext:     p.cfg.backendDialer,
+		},
+	}
+}
+
+func (p *stdioFrontend) BackendURL() string {
+
+	scheme := "http"
+	if p.u.Scheme == "wss" || p.u.Scheme == "https" {
+		scheme = "https"
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, p.u.Host)
+}
+
+func (p *stdioFrontend) BackendInfo() (info.Info, error) {
+	return getBackendInfo(p)
+}
+
 func (p *stdioFrontend) wspump(ctx context.Context) error {
 
 	var failures int
@@ -91,8 +130,8 @@ func (p *stdioFrontend) wspump(ctx context.Context) error {
 			return nil
 
 		default:
-			session, err := Connect(ctx, p.cfg.backendDialer, p.backendURL, p.tlsConfig, AgentInfo{
-				Auth:       p.cfg.auth,
+			session, err := Connect(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, AgentInfo{
+				Auth:       p.agentAuth,
 				UserAgent:  "stdio",
 				RemoteAddr: "local",
 			})

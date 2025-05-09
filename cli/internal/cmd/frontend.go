@@ -60,7 +60,7 @@ var Frontend = &cobra.Command{
 			backendURL = backendURL + "/ws"
 		}
 
-		auth, err := makeAgentAuth()
+		agentAuth, err := makeAgentAuth()
 		if err != nil {
 			return fmt.Errorf("unable to build auth: %w", err)
 		}
@@ -79,7 +79,7 @@ var Frontend = &cobra.Command{
 
 		mm := startHealthServer(cmd.Context())
 
-		var proxy frontend.Frontend
+		var mfrontend frontend.Frontend
 
 		if listen != "" {
 
@@ -100,11 +100,10 @@ var Frontend = &cobra.Command{
 				"listen", listen,
 			)
 
-			proxy = frontend.NewHTTP(listen, backendURL, serverTLSConfig, clientTLSConfig,
+			mfrontend = frontend.NewHTTP(listen, backendURL, serverTLSConfig, clientTLSConfig,
 				frontend.OptHTTPMCPEndpoint(mcpEndpoint),
 				frontend.OptHTTPSSEEndpoint(sseEndpoint),
 				frontend.OptHTTPMessageEndpoint(messageEndpoint),
-				frontend.OptHTTPAgentAuth(auth),
 				frontend.OptHTTPAgentTokenPassthrough(agentAuthPassthrough),
 				frontend.OptHTTPCORSPolicy(corsPolicy),
 				frontend.OptHTTPMetricsManager(mm),
@@ -118,12 +117,12 @@ var Frontend = &cobra.Command{
 				"mode", "stdio",
 			)
 
-			proxy = frontend.NewStdio(backendURL, clientTLSConfig,
-				frontend.OptStioAgentAuth(auth),
+			mfrontend = frontend.NewStdio(backendURL, clientTLSConfig,
 				frontend.OptStdioTracer(tracer),
+				frontend.OptStdioRetry(false),
 			)
 		}
 
-		return proxy.Start(cmd.Context())
+		return startFrontendWithOAuth(cmd.Context(), mfrontend, agentAuth)
 	},
 }

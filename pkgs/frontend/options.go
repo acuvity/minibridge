@@ -5,30 +5,34 @@ import (
 	"net"
 
 	"go.acuvity.ai/bahamut"
-	"go.acuvity.ai/minibridge/pkgs/auth"
 	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
 type httpCfg struct {
-	mcpEndpoint           string
-	sseEndpoint           string
-	messagesEndpoint      string
-	agentTokenPassthrough bool
-	auth                  *auth.Auth
-	corsPolicy            *bahamut.CORSPolicy
-	metricsManager        *metrics.Manager
-	tracer                trace.Tracer
-	backendDialer         func(ctx context.Context, network, addr string) (net.Conn, error)
+	mcpEndpoint            string
+	sseEndpoint            string
+	messagesEndpoint       string
+	agentTokenPassthrough  bool
+	corsPolicy             *bahamut.CORSPolicy
+	metricsManager         *metrics.Manager
+	tracer                 trace.Tracer
+	backendDialer          func(ctx context.Context, network, addr string) (net.Conn, error)
+	oauthEndpointRegister  string
+	oauthEndpointAuthorize string
+	oauthEndpointToken     string
 }
 
 func newHTTPCfg() httpCfg {
 	return httpCfg{
-		mcpEndpoint:      "/mcp",
-		sseEndpoint:      "/sse",
-		messagesEndpoint: "/message",
-		tracer:           noop.NewTracerProvider().Tracer("noop"),
+		mcpEndpoint:            "/mcp",
+		sseEndpoint:            "/sse",
+		messagesEndpoint:       "/message",
+		oauthEndpointRegister:  "/register",
+		oauthEndpointAuthorize: "/authorize",
+		oauthEndpointToken:     "/token",
+		tracer:                 noop.NewTracerProvider().Tracer("noop"),
 	}
 }
 
@@ -70,15 +74,6 @@ func OptHTTPCORSPolicy(policy *bahamut.CORSPolicy) OptHTTP {
 	}
 }
 
-// OptHTTPAgentAuth sets the auth to send to the minibridge
-// backend in order to authenticate the agent sending a request though
-// the minibridge frontend.
-func OptHTTPAgentAuth(auth *auth.Auth) OptHTTP {
-	return func(cfg *httpCfg) {
-		cfg.auth = auth
-	}
-}
-
 // OptHTTPAgentTokenPassthrough decides if the HTTP request Authorization header
 // should be passed as-is to the minibridge backend.
 func OptHTTPAgentTokenPassthrough(passthrough bool) OptHTTP {
@@ -114,7 +109,6 @@ func OptHTTPBackendDialer(dialer func(ctx context.Context, network, addr string)
 
 type stdioCfg struct {
 	retry         bool
-	auth          *auth.Auth
 	tracer        trace.Tracer
 	backendDialer func(ctx context.Context, network, addr string) (net.Conn, error)
 }
@@ -134,14 +128,6 @@ type OptStdio func(*stdioCfg)
 func OptStdioRetry(retry bool) OptStdio {
 	return func(cfg *stdioCfg) {
 		cfg.retry = retry
-	}
-}
-
-// OptStdioAgentToken sets the auth to send to the minibridge
-// backend in order to authenticate the agent using the standard input.
-func OptStioAgentAuth(auth *auth.Auth) OptStdio {
-	return func(cfg *stdioCfg) {
-		cfg.auth = auth
 	}
 }
 

@@ -56,7 +56,7 @@ var AIO = &cobra.Command{
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 
-		auth, err := makeAgentAuth()
+		agentAuth, err := makeAgentAuth()
 		if err != nil {
 			return fmt.Errorf("unable to build auth: %w", err)
 		}
@@ -90,13 +90,14 @@ var AIO = &cobra.Command{
 
 		var eg errgroup.Group
 
+		var mbackend backend.Backend
 		eg.Go(func() error {
 
 			defer cancel()
 
 			slog.Info("Minibridge backend configured")
 
-			proxy := backend.NewWebSocket("self", nil, mcpClient,
+			mbackend = backend.NewWebSocket("self", nil, mcpClient,
 				backend.OptListener(listener),
 				backend.OptPolicer(policer),
 				backend.OptPolicerEnforce(penforce),
@@ -106,14 +107,14 @@ var AIO = &cobra.Command{
 				backend.OptTracer(tracer),
 			)
 
-			return proxy.Start(ctx)
+			return mbackend.Start(ctx)
 		})
 
 		eg.Go(func() error {
 
 			defer cancel()
 
-			var proxy frontend.Frontend
+			var mfrontend frontend.Frontend
 
 			frontendServerTLSConfig, err := tlsConfigFromFlags(fTLSServer)
 			if err != nil {
@@ -130,19 +131,18 @@ var AIO = &cobra.Command{
 					"mcp", mcpEndpoint,
 					"sse", sseEndpoint,
 					"messages", messageEndpoint,
-					"agent-token", auth != nil,
+					"agent-token", agentAuth != nil,
 					"mode", "http",
 					"server-tls", frontendServerTLSConfig != nil,
 					"server-mtls", mtlsMode(frontendServerTLSConfig),
 					"listen", listen,
 				)
 
-				proxy = frontend.NewHTTP(listen, "ws://self/ws", frontendServerTLSConfig, nil,
+				mfrontend = frontend.NewHTTP(listen, "ws://self/ws", frontendServerTLSConfig, nil,
 					frontend.OptHTTPBackendDialer(dialer),
 					frontend.OptHTTPMCPEndpoint(mcpEndpoint),
 					frontend.OptHTTPSSEEndpoint(sseEndpoint),
 					frontend.OptHTTPMessageEndpoint(messageEndpoint),
-					frontend.OptHTTPAgentAuth(auth),
 					frontend.OptHTTPAgentTokenPassthrough(true),
 					frontend.OptHTTPCORSPolicy(corsPolicy),
 					frontend.OptHTTPMetricsManager(mm),
@@ -154,16 +154,16 @@ var AIO = &cobra.Command{
 					"mode", "stdio",
 				)
 
-				proxy = frontend.NewStdio("ws://self/ws", nil,
+				mfrontend = frontend.NewStdio("ws://self/ws", nil,
 					frontend.OptStdioBackendDialer(dialer),
 					frontend.OptStdioRetry(false),
-					frontend.OptStioAgentAuth(auth),
 					frontend.OptStdioTracer(tracer),
 				)
 			}
 
 			time.Sleep(300 * time.Millisecond)
-			return proxy.Start(ctx)
+
+			return startFrontendWithOAuth(ctx, mfrontend, agentAuth)
 		})
 
 		return eg.Wait()
