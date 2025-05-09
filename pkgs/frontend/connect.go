@@ -3,6 +3,7 @@ package frontend
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,6 +16,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )
+
+var ErrAuthRequired = errors.New("authorization required")
 
 // AgentInfo holds information about the agent
 // who sent an MCPCall.
@@ -77,6 +80,11 @@ func Connect(
 		status := "<empty>"
 
 		if resp != nil {
+
+			if resp.StatusCode == http.StatusUnauthorized {
+				return nil, ErrAuthRequired
+			}
+
 			data, _ = io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 

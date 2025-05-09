@@ -266,10 +266,15 @@ func makeCORSPolicy() *bahamut.CORSPolicy {
 			"Content-Type",
 			"Cache-Control",
 			"Cookie",
+			"Mcp-Protocol-Version",
+		},
+		ExposeHeaders: []string{
+			"Mcp-Session-Id",
 		},
 		AllowMethods: []string{
 			"GET",
 			"POST",
+			"DELETE",
 			"OPTIONS",
 		},
 	}

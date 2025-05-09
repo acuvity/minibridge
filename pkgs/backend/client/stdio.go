@@ -36,7 +36,7 @@ func (c *stdioClient) Type() string {
 	return "stdio"
 }
 
-func (c *stdioClient) Start(ctx context.Context) (pipe *MCPStream, err error) {
+func (c *stdioClient) Start(ctx context.Context, _ ...Option) (pipe *MCPStream, err error) {
 
 	dir, err := os.Getwd()
 	if err != nil {
