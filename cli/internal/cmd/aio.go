@@ -1,12 +1,19 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
+	"net/http"
+	"net/url"
 	"time"
 
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -56,7 +63,7 @@ var AIO = &cobra.Command{
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 
-		auth, err := makeAgentAuth()
+		agentAuth, err := makeAgentAuth()
 		if err != nil {
 			return fmt.Errorf("unable to build auth: %w", err)
 		}
@@ -90,13 +97,14 @@ var AIO = &cobra.Command{
 
 		var eg errgroup.Group
 
+		var mbackend backend.Backend
 		eg.Go(func() error {
 
 			defer cancel()
 
 			slog.Info("Minibridge backend configured")
 
-			proxy := backend.NewWebSocket("self", nil, mcpClient,
+			mbackend = backend.NewWebSocket("self", nil, mcpClient,
 				backend.OptListener(listener),
 				backend.OptPolicer(policer),
 				backend.OptPolicerEnforce(penforce),
@@ -106,7 +114,7 @@ var AIO = &cobra.Command{
 				backend.OptTracer(tracer),
 			)
 
-			return proxy.Start(ctx)
+			return mbackend.Start(ctx)
 		})
 
 		eg.Go(func() error {
@@ -130,7 +138,7 @@ var AIO = &cobra.Command{
 					"mcp", mcpEndpoint,
 					"sse", sseEndpoint,
 					"messages", messageEndpoint,
-					"agent-token", auth != nil,
+					"agent-token", agentAuth != nil,
 					"mode", "http",
 					"server-tls", frontendServerTLSConfig != nil,
 					"server-mtls", mtlsMode(frontendServerTLSConfig),
@@ -142,7 +150,7 @@ var AIO = &cobra.Command{
 					frontend.OptHTTPMCPEndpoint(mcpEndpoint),
 					frontend.OptHTTPSSEEndpoint(sseEndpoint),
 					frontend.OptHTTPMessageEndpoint(messageEndpoint),
-					frontend.OptHTTPAgentAuth(auth),
+					frontend.OptHTTPAgentAuth(agentAuth),
 					frontend.OptHTTPAgentTokenPassthrough(true),
 					frontend.OptHTTPCORSPolicy(corsPolicy),
 					frontend.OptHTTPMetricsManager(mm),
@@ -157,15 +165,168 @@ var AIO = &cobra.Command{
 				proxy = frontend.NewStdio("ws://self/ws", nil,
 					frontend.OptStdioBackendDialer(dialer),
 					frontend.OptStdioRetry(false),
-					frontend.OptStioAgentAuth(auth),
+					frontend.OptStioAgentAuth(agentAuth),
 					frontend.OptStdioTracer(tracer),
 				)
 			}
 
 			time.Sleep(300 * time.Millisecond)
-			return proxy.Start(ctx)
+
+			if err = proxy.Start(ctx); errors.Is(err, frontend.ErrAuthRequired) {
+
+				if p, ok := mcpClient.(backend.OAuth2Provider); ok {
+
+					mboauth := mbackend.(backend.OAuth2Provider)
+					cl := &http.Client{
+						Transport: &http.Transport{
+							DialContext: func(ctx context.Context, net string, addr string) (net.Conn, error) {
+								return listener.DialContext(ctx, "127.0.0.1:7987")
+							},
+						},
+					}
+
+					oreq := oauthRegistration{
+						ClientName:          "minibridge",
+						ClientURI:           "https://github.com/acuvity/minibridge",
+						RedirectURI:         []string{"http://127.0.0.1:9977/callback"},
+						TokenEndpointMethod: "none",
+						GrantTypes:          []string{"authorization_code", "refresh_token"},
+						ResponseTypes:       []string{"code"},
+					}
+
+					data, err := json.MarshalIndent(oreq, "", "  ")
+					if err != nil {
+						return err
+					}
+
+					u := fmt.Sprintf("%s/oauth2/register", mboauth.BaseURL())
+					req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewBuffer(data))
+					if err != nil {
+						return err
+					}
+					req.Header.Set("Content-Type", "application/json")
+					req.Header.Set("Accept", "application/json")
+
+					resp, err := cl.Do(req)
+					if err != nil {
+						return err
+					}
+
+					data, err = io.ReadAll(resp.Body)
+					if err != nil {
+						return err
+					}
+
+					if err := json.Unmarshal(data, &oreq); err != nil {
+						return err
+					}
+
+					values := url.Values{
+						"response_type": {"code"},
+						"client_id":     {oreq.ClientID},
+						"redirect_uri":  {"http://127.0.0.1:9977/callback"},
+					}
+					u = fmt.Sprintf("%s/authorize?%s", p.BaseURL(), values.Encode())
+					if err := browser.OpenURL(u); err != nil {
+						fmt.Println("Open the following URL in your browser:", u)
+					}
+
+					codeCh := make(chan string, 1)
+
+					server := &http.Server{
+						ReadHeaderTimeout: 3 * time.Second,
+						Addr:              "127.0.0.1:9977",
+					}
+					server.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						codeCh <- req.URL.Query().Get("code")
+						sctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+						defer cancel()
+						server.Shutdown(sctx)
+					})
+
+					go func() {
+						if err := server.ListenAndServe(); err != nil {
+							if !errors.Is(err, http.ErrServerClosed) {
+								slog.Error("Unable to start oauth callback server", err)
+								return
+							}
+						}
+					}()
+
+					var code string
+					select {
+					case code = <-codeCh:
+					case <-ctx.Done():
+						return nil
+					case <-time.After(10 * time.Minute):
+						return fmt.Errorf("oauth timeout")
+					}
+
+					u = fmt.Sprintf("%s/oauth2/token", mboauth.BaseURL())
+
+					form := url.Values{
+						"grant_type":   {"authorization_code"},
+						"client_id":    {oreq.ClientID},
+						"code":         {code},
+						"redirect_uri": {"http://127.0.0.1:9977/callback"},
+					}
+
+					req, err = http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewBuffer([]byte(form.Encode())))
+					if err != nil {
+						return err
+					}
+					req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+					req.Header.Set("Accept", "application/json")
+
+					resp, err = cl.Do(req)
+					if err != nil {
+						return err
+					}
+
+					data, err = io.ReadAll(resp.Body)
+					if err != nil {
+						return err
+					}
+
+					if resp.StatusCode != http.StatusOK {
+						return fmt.Errorf("invalid status code: %s (%s)", resp.Status, string(data))
+					}
+
+					ex := oauthExchange{}
+					if err := json.Unmarshal(data, &ex); err != nil {
+						return err
+					}
+
+					fmt.Println("OAUTH DANCE COMPLETE: next time use", ex.AccessToken)
+					return nil
+
+				}
+
+				return err
+			}
+
+			return err
 		})
 
 		return eg.Wait()
 	},
+}
+
+type oauthRegistration struct {
+	RedirectURI         []string `json:"redirect_uris"`
+	ClientName          string   `json:"client_name"`
+	ClientURI           string   `json:"client_uri,omitempty"`
+	TokenEndpointMethod string   `json:"token_endpoint_auth_method"`
+	LogoURI             string   `json:"logo_uri,omitempty"`
+	ResponseTypes       []string `json:"response_types,omitempty"`
+	GrantTypes          []string `json:"grant_types,omitempty"`
+
+	ClientID             string `json:"client_id,omitempty"`
+	RegistrationClientID string `json:"registration_client_uri,omitempty"`
+	ClientIDIssuedAt     int    `json:"client_id_issued_at,omitempty"`
+}
+
+type oauthExchange struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }

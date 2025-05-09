@@ -40,7 +40,7 @@ func TestSSEClient(t *testing.T) {
 
 		pipe, err := cl.Start(ctx)
 		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldEqual, "unable to send initial sse request: Get \"http://789.11.22.11/sse\": dial tcp: lookup 789.11.22.11: no such host")
+		So(err.Error(), ShouldEqual, "unable to send initial sse request (http://789.11.22.11/sse): Get \"http://789.11.22.11/sse\": dial tcp: lookup 789.11.22.11: no such host")
 		So(pipe, ShouldBeNil)
 	})
 
@@ -91,7 +91,7 @@ func TestSSEClient(t *testing.T) {
 
 		pipe, err := cl.Start(ctx)
 		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldEqual, "invalid response from sse initialization: 507 Insufficient Storage")
+		So(err.Error(), ShouldEqual, fmt.Sprintf("invalid response from sse initialization (%s/sse): 507 Insufficient Storage", ts.URL))
 		So(pipe, ShouldBeNil)
 	})
 

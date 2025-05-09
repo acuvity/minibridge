@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -117,37 +119,34 @@ func (p *httpFrontend) Start(ctx context.Context) error {
 	return p.server.Shutdown(stopCtx)
 }
 
-// startSession register a new session, connects to the backend ws, acquires it immediately, and returns it.
-// Caller MUST release the session when you done using releaseSession.
-func (p *httpFrontend) startSession(ctx context.Context, req *http.Request) (*session.Session, error) {
+// ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
+// you can use this function directly into your own *http.Server.
+func (p *httpFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
-	p.Lock()
-	defer p.Unlock()
-
-	auth, authHeader := p.getCreds(req)
-	ch := hashCreds(auth, authHeader)
-
-	if ctx == nil {
-		ctx = context.Background()
+	if !cors.HandleCORS(w, req, p.cfg.corsPolicy) {
+		return
 	}
 
-	ws, err := Connect(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, AgentInfo{
-		Auth:        auth,
-		AuthHeaders: authHeader,
-		RemoteAddr:  req.RemoteAddr,
-		UserAgent:   req.UserAgent(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("unable to register session backend: %w", err)
+	switch req.URL.Path {
+
+	case p.cfg.mcpEndpoint:
+		p.handleMCP(w, req)
+
+	case p.cfg.sseEndpoint:
+		p.handleSSE(w, req)
+
+	case p.cfg.messagesEndpoint:
+		p.handleMessages(w, req)
+
+	case "/.well-known/oauth-authorization-server",
+		p.cfg.oauthEndpointRegister,
+		p.cfg.oauthEndpointAuthorize,
+		p.cfg.oauthEndpointToken:
+		p.handleOAuth2(w, req)
+
+	default:
+		http.Error(w, "Not Found", http.StatusNotFound)
 	}
-
-	sid := fmt.Sprintf("%x", ch)
-
-	s := session.New(ws, ch, sid)
-
-	p.smanager.Register(s)
-
-	return s, nil
 }
 
 func (p *httpFrontend) handleMCP(w http.ResponseWriter, req *http.Request) {
@@ -211,6 +210,13 @@ func (p *httpFrontend) handleMCP(w http.ResponseWriter, req *http.Request) {
 	if call.Method == "initialize" {
 
 		if s, err = p.startSession(ctx, req); err != nil {
+
+			if errors.Is(err, ErrAuthRequired) {
+				w.WriteHeader(http.StatusUnauthorized)
+				m(http.StatusUnauthorized)
+				return
+			}
+
 			http.Error(w, fmt.Sprintf("unable to start session: %s", err), http.StatusForbidden)
 			m(http.StatusForbidden)
 			return
@@ -326,6 +332,12 @@ func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 	s, err := p.startSession(ctx, req)
 	if err != nil {
+		if errors.Is(err, ErrAuthRequired) {
+			w.WriteHeader(http.StatusUnauthorized)
+			m(http.StatusUnauthorized)
+			return
+		}
+
 		http.Error(w, fmt.Sprintf("Unable to connect to minibridge end: %s", err), http.StatusForbidden)
 		m(http.StatusForbidden)
 		return
@@ -448,28 +460,66 @@ func (p *httpFrontend) handleMessages(w http.ResponseWriter, req *http.Request) 
 	s.Write(sanitize.Data(data))
 }
 
-// ServeHTTP is the main HTTP handler. If you decide to not start the built-in server
-// you can use this function directly into your own *http.Server.
-func (p *httpFrontend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (p *httpFrontend) handleOAuth2(w http.ResponseWriter, req *http.Request) {
 
-	if !cors.HandleCORS(w, req, p.cfg.corsPolicy) {
-		return
+	u := strings.TrimSuffix(p.backendURL, "/ws")
+	uu, err := url.Parse(u)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unable to parse oauth2 url: %s", err), http.StatusBadRequest)
 	}
 
-	switch req.URL.Path {
-
-	case p.cfg.mcpEndpoint:
-		p.handleMCP(w, req)
-
-	case p.cfg.sseEndpoint:
-		p.handleSSE(w, req)
-
-	case p.cfg.messagesEndpoint:
-		p.handleMessages(w, req)
-
-	default:
-		http.Error(w, "Not Found", http.StatusNotFound)
+	uu.Scheme = "http"
+	if p.tlsClientConfig != nil {
+		uu.Scheme = "https"
 	}
+
+	uu.Path = "/oauth2"
+	uu.RawPath = uu.Path
+
+	proxy := &httputil.ReverseProxy{
+		Transport: &http.Transport{
+			DialContext:     p.cfg.backendDialer,
+			TLSClientConfig: p.tlsClientConfig,
+		},
+		Rewrite: func(r *httputil.ProxyRequest) {
+			r.SetURL(uu)
+		},
+	}
+
+	proxy.ServeHTTP(w, req)
+}
+
+// startSession register a new session, connects to the backend ws, acquires it immediately, and returns it.
+// Caller MUST release the session when you done using releaseSession.
+func (p *httpFrontend) startSession(ctx context.Context, req *http.Request) (*session.Session, error) {
+
+	p.Lock()
+	defer p.Unlock()
+
+	auth, authHeader := p.getCreds(req)
+	ch := hashCreds(auth, authHeader)
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	ws, err := Connect(ctx, p.cfg.backendDialer, p.backendURL, p.tlsClientConfig, AgentInfo{
+		Auth:        auth,
+		AuthHeaders: authHeader,
+		RemoteAddr:  req.RemoteAddr,
+		UserAgent:   req.UserAgent(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to register session backend: %w", err)
+	}
+
+	sid := fmt.Sprintf("%x", ch)
+
+	s := session.New(ws, ch, sid)
+
+	p.smanager.Register(s)
+
+	return s, nil
 }
 
 func (p *httpFrontend) getCreds(req *http.Request) (auth *auth.Auth, authHeaders []string) {

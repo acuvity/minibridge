@@ -12,23 +12,29 @@ import (
 )
 
 type httpCfg struct {
-	mcpEndpoint           string
-	sseEndpoint           string
-	messagesEndpoint      string
-	agentTokenPassthrough bool
-	auth                  *auth.Auth
-	corsPolicy            *bahamut.CORSPolicy
-	metricsManager        *metrics.Manager
-	tracer                trace.Tracer
-	backendDialer         func(ctx context.Context, network, addr string) (net.Conn, error)
+	mcpEndpoint            string
+	sseEndpoint            string
+	messagesEndpoint       string
+	agentTokenPassthrough  bool
+	auth                   *auth.Auth
+	corsPolicy             *bahamut.CORSPolicy
+	metricsManager         *metrics.Manager
+	tracer                 trace.Tracer
+	backendDialer          func(ctx context.Context, network, addr string) (net.Conn, error)
+	oauthEndpointRegister  string
+	oauthEndpointAuthorize string
+	oauthEndpointToken     string
 }
 
 func newHTTPCfg() httpCfg {
 	return httpCfg{
-		mcpEndpoint:      "/mcp",
-		sseEndpoint:      "/sse",
-		messagesEndpoint: "/message",
-		tracer:           noop.NewTracerProvider().Tracer("noop"),
+		mcpEndpoint:            "/mcp",
+		sseEndpoint:            "/sse",
+		messagesEndpoint:       "/message",
+		oauthEndpointRegister:  "/register",
+		oauthEndpointAuthorize: "/authorize",
+		oauthEndpointToken:     "/token",
+		tracer:                 noop.NewTracerProvider().Tracer("noop"),
 	}
 }
 

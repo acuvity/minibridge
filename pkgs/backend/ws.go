@@ -64,6 +64,20 @@ func NewWebSocket(listen string, tlsConfig *tls.Config, client client.Client, op
 	return p
 }
 
+func (p *wsBackend) BaseURL() string {
+
+	scheme := "http"
+	if p.tlsConfig != nil {
+		scheme = "https"
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, p.listen)
+}
+
+func (p *wsBackend) Client() *http.Client {
+	panic("not implemented")
+}
+
 // Start starts the server and will block until the given
 // context is canceled.
 func (p *wsBackend) Start(ctx context.Context) (err error) {
@@ -125,6 +139,30 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	switch req.URL.Path {
+
+	case "/ws":
+		p.handleWS(w, req)
+
+	case "/oauth2/.well-known/oauth-authorization-server":
+		defer handleOAuth(p.client, w, req, "/.well-known/oauth-authorization-server")()
+
+	case "/oauth2/register":
+		defer handleOAuth(p.client, w, req, "/register")()
+
+	case "/oauth2/authorize":
+		defer handleOAuth(p.client, w, req, "/authorize")()
+
+	case "/oauth2/token":
+		defer handleOAuth(p.client, w, req, "/token")()
+
+	default:
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func (p *wsBackend) handleWS(w http.ResponseWriter, req *http.Request) {
+
 	ctx, span := p.cfg.tracer.Start(req.Context(), "backend")
 	defer span.End()
 
@@ -135,13 +173,22 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		defer mm.UnregisterWSConnection()
 	}
 
-	if req.Method != http.MethodGet || req.URL.Path != "/ws" {
-		hErr(w, "only supports GET /ws", http.StatusBadRequest, span)
+	if req.Method != http.MethodGet {
+		hErr(w, "only supports GET /ws", http.StatusMethodNotAllowed, span)
 		return
 	}
 
-	stream, err := p.client.Start(ctx)
+	auth, hasAuth := parseBasicAuth(req.Header.Get("Authorization"))
+
+	stream, err := p.client.Start(ctx, client.OptionAuth(auth))
 	if err != nil {
+
+		if errors.Is(err, client.ErrAuthRequired) {
+			hErr(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusUnauthorized, span)
+			m(http.StatusUnauthorized)
+			return
+		}
+
 		slog.Error("Unable to start mcp client", "type", p.client.Type(), err)
 		hErr(w, fmt.Sprintf("unable to start mcp client: %s", err), http.StatusInternalServerError, span)
 		m(http.StatusInternalServerError)
@@ -156,8 +203,6 @@ func (p *wsBackend) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		m(http.StatusInternalServerError)
 		return
 	}
-
-	auth, hasAuth := parseBasicAuth(req.Header.Get("Authorization"))
 
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
