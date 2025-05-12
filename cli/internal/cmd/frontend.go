@@ -60,7 +60,7 @@ var Frontend = &cobra.Command{
 			backendURL = backendURL + "/ws"
 		}
 
-		agentAuth, err := makeAgentAuth()
+		agentAuth, err := makeAgentAuth(true)
 		if err != nil {
 			return fmt.Errorf("unable to build auth: %w", err)
 		}

@@ -67,7 +67,7 @@ var Backend = &cobra.Command{
 
 		corsPolicy := makeCORSPolicy()
 
-		mcpClient, err := makeMCPClient(args)
+		mcpClient, err := makeMCPClient(args, true)
 		if err != nil {
 			return fmt.Errorf("unable to create MCP client: %w", err)
 		}

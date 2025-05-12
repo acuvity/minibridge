@@ -225,7 +225,7 @@ func makePolicer() (policer.Policer, bool, error) {
 	}
 }
 
-func makeAgentAuth() (a *auth.Auth, err error) {
+func makeAgentAuth(log bool) (a *auth.Auth, err error) {
 
 	user := viper.GetString("agent-user")
 	pass := viper.GetString("agent-pass")
@@ -246,7 +246,13 @@ func makeAgentAuth() (a *auth.Auth, err error) {
 	}
 
 	if a != nil {
-		slog.Info("Agent credential configured", "type", a.Type(), "user", a.User(), "password", a.Password() != "")
+
+		l := slog.Info
+		if !log {
+			l = slog.Info
+		}
+
+		l("Agent credential configured", "type", a.Type(), "user", a.User(), "password", a.Password() != "")
 	}
 
 	return a, nil
@@ -370,7 +376,7 @@ func makeTracer(ctx context.Context, name string) (trace.Tracer, error) {
 	return tp.Tracer(name), nil
 }
 
-func makeMCPClient(args []string) (client.Client, error) {
+func makeMCPClient(args []string, log bool) (client.Client, error) {
 
 	ca := viper.GetString("mcp-tls-ca")
 	skip := viper.GetBool("mcp-tls-insecure-skip-verify")
@@ -410,10 +416,12 @@ func makeMCPClient(args []string) (client.Client, error) {
 			}
 		}
 
-		slog.Info("MCP server configured",
-			"mode", "sse",
-			"url", args[0],
-		)
+		l := slog.Info
+		if !log {
+			l = slog.Info
+		}
+
+		l("MCP server configured", "mode", "sse", "url", args[0])
 
 		return client.NewSSE(args[0], tlsConfig), nil
 

@@ -56,7 +56,7 @@ var AIO = &cobra.Command{
 		sseEndpoint := viper.GetString("endpoint-sse")
 		messageEndpoint := viper.GetString("endpoint-messages")
 
-		agentAuth, err := makeAgentAuth()
+		agentAuth, err := makeAgentAuth(true)
 		if err != nil {
 			return fmt.Errorf("unable to build auth: %w", err)
 		}
@@ -78,7 +78,7 @@ var AIO = &cobra.Command{
 
 		corsPolicy := makeCORSPolicy()
 
-		mcpClient, err := makeMCPClient(args)
+		mcpClient, err := makeMCPClient(args, true)
 		if err != nil {
 			return fmt.Errorf("unable to create MCP client: %w", err)
 		}

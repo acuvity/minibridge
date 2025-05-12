@@ -20,14 +20,14 @@ func init() {
 
 	initSharedFlagSet()
 
-	fScan.DurationP("timeout", "t", 2*time.Minute, "maximum time to allow the scan to run.")
-
+	fScan.Duration("timeout", 2*time.Minute, "maximum time to allow the scan to run.")
 	fScan.Bool("exclude-resources", false, "exclude resources from scan")
 	fScan.Bool("exclude-tools", false, "exclude tools from scan")
 	fScan.Bool("exclude-prompts", false, "exclude prompts from scan")
 
 	Scan.Flags().AddFlagSet(fScan)
-	Scan.Flags().AddFlagSet(fBackend)
+	Scan.Flags().AddFlagSet(fMCP)
+	Scan.Flags().AddFlagSet(fAgentAuth)
 }
 
 // Scan is the cobra command to run the server.
@@ -59,20 +59,28 @@ var Scan = &cobra.Command{
 		}
 		defer cancel()
 
-		var mcpServer client.MCPServer
 		var err error
+		var mcpCommand string
+		var mcpArgs []string
 		if args[0] == "check" {
-			mcpServer, err = client.NewMCPServer(args[2], args[3:]...)
+			mcpCommand = args[2]
+			mcpArgs = args[3:]
 		} else {
-			mcpServer, err = client.NewMCPServer(args[1], args[2:]...)
+			mcpCommand = args[1]
+			mcpArgs = args[2:]
 		}
+
+		mcpClient, err := makeMCPClient(append([]string{mcpCommand}, mcpArgs...), false)
 		if err != nil {
 			return err
 		}
 
-		client := client.NewStdio(mcpServer)
+		agentAuth, err := makeAgentAuth(false)
+		if err != nil {
+			return fmt.Errorf("unable to build auth: %w", err)
+		}
 
-		stream, err := client.Start(ctx)
+		stream, err := mcpClient.Start(ctx, client.OptionAuth(agentAuth))
 		if err != nil {
 			return fmt.Errorf("unable to start MCP server: %w", err)
 		}
