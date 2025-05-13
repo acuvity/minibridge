@@ -57,13 +57,13 @@ brew install minibridge
 
 On Arch based Linux distributions, you can run:
 
-```json
+```console
 yay -S minibridge
 ```
 
 Alternatively, to get the latest version from the main branch:
 
-```json
+```console
 yay -S minibridge-git
 ```
 
