@@ -44,7 +44,7 @@ signs:
 brews:
   - name: minibridge
     homepage: "https://github.com/acuvity/minibridge"
-    description: Minibridge securely connects Agents to MCP servers, exposing them to the internet while enabling optional integration with remote or local Policers for authentication, analysis, and transformation."
+    description: Minibridge securely connects Agents to MCP servers, exposing them to the internet while enabling optional integration with remote or local Policers for authentication, analysis, and transformation.
     license: "Apache"
     repository:
       owner: acuvity
