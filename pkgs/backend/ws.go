@@ -491,7 +491,7 @@ func (p *wsBackend) police(ctx context.Context, spc *api.SpanContext, rtype api.
 
 	rcall, err := p.cfg.policer.Police(ctx, req)
 
-	logFunc := slog.Info
+	logFunc := slog.Debug
 	if !p.cfg.policerEnforced && err != nil {
 		logFunc = slog.Warn
 	}
