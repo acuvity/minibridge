@@ -1,5 +1,6 @@
 minibridge
 dist
+*.exe
 *.pem
 *.token
 *.sbom

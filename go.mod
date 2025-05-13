@@ -3,9 +3,9 @@ module go.acuvity.ai/minibridge
 go 1.24.2
 
 require (
-	go.acuvity.ai/a3s v0.0.0-20250416135901-d1835cc310f7
+	go.acuvity.ai/a3s v0.0.0-20250513140342-5386bdb1c75f
 	go.acuvity.ai/bahamut v0.0.0-20250416135203-fa73110b2604
-	go.acuvity.ai/elemental v0.0.0-20250416135043-bd666177eb03
+	go.acuvity.ai/elemental v0.0.0-20250430230636-ac931152934a
 	go.acuvity.ai/manipulate v0.0.0-20250416135246-f7d22e975de4 // indirect
 	go.acuvity.ai/regolithe v0.0.0-20250321141528-1fe83b60f317 // indirect
 	go.acuvity.ai/tg v0.0.0-20250220234315-d9494083aa3a

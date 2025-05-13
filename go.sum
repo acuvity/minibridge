@@ -347,12 +347,12 @@ github.com/yusufpapurcu/wmi v1.2.4 h1:zFUKzehAFReQwLys1b/iSMl+JQGSCSjtVqQn9bBrPo
 github.com/yusufpapurcu/wmi v1.2.4/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQmPyzfmi0=
 github.com/zalando/go-keyring v0.2.6 h1:r7Yc3+H+Ux0+M72zacZoItR3UDxeWfKTcabvkI8ua9s=
 github.com/zalando/go-keyring v0.2.6/go.mod h1:2TCrxYrbUNYfNS/Kgy/LSrkSQzZ5UPVH85RwfczwvcI=
-go.acuvity.ai/a3s v0.0.0-20250416135901-d1835cc310f7 h1:NeTjOtjgbl3CEu570Q/lqtu4cw0gNJ/7oOeedzBwRVI=
-go.acuvity.ai/a3s v0.0.0-20250416135901-d1835cc310f7/go.mod h1:UldI8c5bDZThZtlKrv474KzztX2NEBspDjlj/s3xnh4=
+go.acuvity.ai/a3s v0.0.0-20250513140342-5386bdb1c75f h1:gXgQiFdP4zOwHRPwdTlRJqu3g0NyWT/T7feCaBYI8bc=
+go.acuvity.ai/a3s v0.0.0-20250513140342-5386bdb1c75f/go.mod h1:UldI8c5bDZThZtlKrv474KzztX2NEBspDjlj/s3xnh4=
 go.acuvity.ai/bahamut v0.0.0-20250416135203-fa73110b2604 h1:ji5IvJ9tdUme8qejuKhPBD9Yh83jzOt7HCiUYS7Nc88=
 go.acuvity.ai/bahamut v0.0.0-20250416135203-fa73110b2604/go.mod h1:istxCfKehrgtPrnN4/TG4fTltd0cJR5jelpuQ0PT1cE=
-go.acuvity.ai/elemental v0.0.0-20250416135043-bd666177eb03 h1:yS4IzMxBvWNbhWfTHlqCig/HTQSrutwZWeTvmLbzjYk=
-go.acuvity.ai/elemental v0.0.0-20250416135043-bd666177eb03/go.mod h1:dcupKzu3SFY0evDRFVt92KYaRqgzQTaHJ9ivtUPclUQ=
+go.acuvity.ai/elemental v0.0.0-20250430230636-ac931152934a h1:k2KCwCr+zrdw+/dODQ08nC6cr1dkk1P7b+ngYKaqCkE=
+go.acuvity.ai/elemental v0.0.0-20250430230636-ac931152934a/go.mod h1:dcupKzu3SFY0evDRFVt92KYaRqgzQTaHJ9ivtUPclUQ=
 go.acuvity.ai/manipulate v0.0.0-20250416135246-f7d22e975de4 h1:Ct/qW7uRJ7SgytDVVmbCQDJYpbFWE9Umf6cqzoRpyAc=
 go.acuvity.ai/manipulate v0.0.0-20250416135246-f7d22e975de4/go.mod h1:YpFwUpVf+vN9UcIw/ijYfcj0x65NDKM+yUo3qojhAOc=
 go.acuvity.ai/regolithe v0.0.0-20250321141528-1fe83b60f317 h1:zNRhRowG4yQgncNdR/IBZBhLskcc4W30QOWzpVVOZzM=
