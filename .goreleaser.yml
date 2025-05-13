@@ -47,7 +47,7 @@ brews:
     license: "Apache"
     repository:
       owner: acuvity
-      name: homebrew-tools
+      name: homebrew-tap
     commit_author:
       name: goreleaserbot
       email: goreleaser@acuvity.ai
