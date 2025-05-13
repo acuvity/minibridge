@@ -40,6 +40,53 @@ Minibridge covers the following:
 - **Monitoring**: Expose prometheus metrics
 - **Telemetry**: Report traces and spans using Opentelemetry
 
+## Installation
+
+Minibridge can be installed from various places:
+
+### Homebrew
+
+On macOS, you can use Homebrew
+
+```console
+brew tap acuvity/tap
+brew install minibridge
+```
+
+### AUR
+
+On Arch based Linux distributions, you can run:
+
+```json
+yay -S minibridge
+```
+
+Alternatively, to get the latest version from the main branch:
+
+```json
+yay -S minibridge-git
+```
+
+### Go
+
+If you have the Go toolchain install:
+
+```console
+go install go.acuvity.ai/minibridge@latest
+```
+
+Alternatively, to get the latest version from the main branch:
+
+```console
+go install go.acuvity.ai/minibridge@main
+```
+
+### Manually
+
+You can easily grab a binary version for your platform from the [release
+page](https://github.com/acuvity/minibridge/releases/tag/v0.6.2).
+
+
 ## Features comparisons
 
 | 🚀 **Feature**                 | 🔹 **MCP**  | 🔸 **Minibridge** | 📦 **ARC (Acuvity Containers)** |
