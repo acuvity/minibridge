@@ -467,6 +467,11 @@ func makeMCPClient(args []string, log bool) (client.Client, error) {
 
 func startFrontendWithOAuth(ctx context.Context, mfrontend frontend.Frontend, agentAuth *auth.Auth) error {
 
+	if viper.GetBool("oauth-disabled") {
+		slog.Info("OAuth authentication dance is disabled")
+		return mfrontend.Start(ctx, agentAuth)
+	}
+
 	hasCustomAgentAuth := agentAuth != nil
 
 	inf, err := mfrontend.BackendInfo()
