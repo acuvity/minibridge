@@ -190,6 +190,7 @@ func (c *sseClient) readResponse(ctx context.Context, r io.ReadCloser, ch chan [
 
 	scan := bufio.NewScanner(r)
 	scan.Split(split)
+	scan.Buffer(make([]byte, 1024), 5*1024*1024)
 
 	for scan.Scan() {
 
