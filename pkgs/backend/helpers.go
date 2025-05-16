@@ -8,17 +8,17 @@ import (
 
 	"go.acuvity.ai/elemental"
 	"go.acuvity.ai/minibridge/pkgs/auth"
-	"go.acuvity.ai/minibridge/pkgs/policer/api"
+	"go.acuvity.ai/minibridge/pkgs/mcp"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
 func makeMCPError(ID any, err error) []byte {
 
-	mpcerr := api.MCPCall{
+	mpcerr := mcp.Message{
 		JSONRPC: "2.0",
 		ID:      ID,
-		Error: &api.MCPError{
+		Error: &mcp.Error{
 			Code:    451,
 			Message: err.Error(),
 		},

@@ -418,7 +418,7 @@ func makeMCPClient(args []string, log bool) (client.Client, error) {
 
 		l := slog.Info
 		if !log {
-			l = slog.Info
+			l = slog.Debug
 		}
 
 		l("MCP server configured", "mode", "sse", "url", args[0])
@@ -436,12 +436,17 @@ func makeMCPClient(args []string, log bool) (client.Client, error) {
 			client.OptStdioUseTempDir(tmp),
 		}
 
+		l := slog.Info
+		if !log {
+			l = slog.Debug
+		}
+
 		if uid > -1 && gid > -1 || len(groups) > 0 {
 			opts = append(opts, client.OptStdioCredentials(uid, gid, groups))
 		}
 
 		if uid > -1 || gid > -1 || len(groups) > 0 || tmp {
-			slog.Info("MCP server isolation",
+			l("MCP server isolation",
 				"use-temp", tmp,
 				"uid", uid,
 				"gid", gid,
@@ -454,11 +459,7 @@ func makeMCPClient(args []string, log bool) (client.Client, error) {
 			return nil, fmt.Errorf("unable to create mcp server: %w", err)
 		}
 
-		slog.Info("MCP server configured",
-			"mode", "stdio",
-			"command", mcpsrv.Command,
-			"args", mcpsrv.Args,
-		)
+		l("MCP server configured", "mode", "stdio", "command", mcpsrv.Command, "args", mcpsrv.Args)
 
 		return client.NewStdio(mcpsrv, opts...), nil
 	}

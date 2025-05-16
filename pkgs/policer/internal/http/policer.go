@@ -11,6 +11,7 @@ import (
 
 	"go.acuvity.ai/elemental"
 	"go.acuvity.ai/minibridge/pkgs/auth"
+	"go.acuvity.ai/minibridge/pkgs/mcp"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 )
 
@@ -36,7 +37,7 @@ func New(endpoint string, auth *auth.Auth, tlsConfig *tls.Config) *Policer {
 
 func (p *Policer) Type() string { return "http" }
 
-func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, error) {
+func (p *Policer) Police(ctx context.Context, preq api.Request) (*mcp.Message, error) {
 
 	body, err := elemental.Encode(elemental.EncodingTypeJSON, preq)
 	if err != nil {
@@ -76,7 +77,7 @@ func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, e
 		return nil, fmt.Errorf("unable to decode response body: %w", err)
 	}
 
-	if sresp.MCP != nil && preq.MCP.IDString() != "" {
+	if sresp.MCP != nil && preq.MCP.ID != nil {
 		sresp.MCP.ID = preq.MCP.ID
 	}
 

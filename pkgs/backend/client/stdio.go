@@ -96,30 +96,19 @@ func (c *stdioClient) Start(ctx context.Context, _ ...Option) (pipe *MCPStream, 
 		return nil, fmt.Errorf("unable to create stderr pipe: %w", err)
 	}
 
-	inCh := make(chan []byte)
-	go c.readRequests(ctx, stdin, inCh)
+	stream := NewMCPStream(ctx)
 
-	outCh := make(chan []byte)
-	go c.readResponses(ctx, stdout, outCh)
-
-	errCh := make(chan []byte)
-	go c.readErrors(ctx, stderr, errCh)
+	go c.readRequests(ctx, stdin, stream.stdin)
+	go c.readResponses(ctx, stdout, stream.stdout)
+	go c.readErrors(ctx, stderr, stream.stderr)
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("unable to start command: %w", err)
 	}
 
-	exitCh := make(chan error)
-	go func() {
-		exitCh <- cmd.Wait()
-	}()
+	go func() { stream.exit <- cmd.Wait() }()
 
-	return &MCPStream{
-		Stdin:  inCh,
-		Stdout: outCh,
-		Stderr: errCh,
-		Exit:   exitCh,
-	}, nil
+	return stream, nil
 }
 
 func (c *stdioClient) readRequests(ctx context.Context, stdin io.WriteCloser, ch chan []byte) {

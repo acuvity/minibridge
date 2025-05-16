@@ -1,6 +1,10 @@
 package api
 
-import "time"
+import (
+	"time"
+
+	"go.acuvity.ai/minibridge/pkgs/mcp"
+)
 
 // CallType type of request to the policer.
 type CallType string
@@ -35,7 +39,7 @@ type Request struct {
 
 	// MPC embeds the full MPC call, either request or response,
 	// based on the Type.
-	MCP MCPCall `json:"mcp,omitzero"`
+	MCP mcp.Message `json:"mcp,omitzero"`
 
 	// Agent contains callers information.
 	Agent Agent `json:"agent,omitzero"`

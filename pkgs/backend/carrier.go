@@ -1,7 +1,7 @@
 package backend
 
 import (
-	"go.acuvity.ai/minibridge/pkgs/policer/api"
+	"go.acuvity.ai/minibridge/pkgs/mcp"
 	"go.opentelemetry.io/otel/propagation"
 )
 
@@ -11,7 +11,7 @@ type metaCarrier struct {
 	meta map[string]string
 }
 
-func newMCPMetaCarrier(call api.MCPCall) metaCarrier {
+func newMCPMetaCarrier(call mcp.Message) metaCarrier {
 
 	meta := map[string]string{}
 

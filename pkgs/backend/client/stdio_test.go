@@ -31,8 +31,13 @@ func TestStdioClient(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
 
-		stream.Stdin <- []byte("hello world\r\n\n\n")
-		So(<-stream.Stdout, ShouldResemble, []byte("hello world"))
+		out, unregister := stream.Stdout()
+		defer unregister()
+
+		stream.Stdin() <- []byte("hello world\r\n\n\n")
+
+		data := <-out
+		So(data, ShouldResemble, []byte("hello world"))
 	})
 
 	Convey("Given I have a client with env", t, func() {
@@ -51,8 +56,17 @@ func TestStdioClient(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
 
-		So(string(<-stream.Stdout), ShouldEqual, "HELLO")
-		So(<-stream.Exit, ShouldBeNil)
+		out, unregisterOut := stream.Stdout()
+		defer unregisterOut()
+
+		exit, unregisterExit := stream.Exit()
+		defer unregisterExit()
+
+		data := <-out
+		So(string(data), ShouldEqual, "HELLO")
+
+		err = <-exit
+		So(err, ShouldBeNil)
 	})
 
 	Convey("Given I have a client to which I give an invalid server", t, func() {
@@ -85,12 +99,15 @@ func TestStdioClient(t *testing.T) {
 		stream, err := cl.Start(ctx)
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
+
+		exit, unregister := stream.Exit()
+		defer unregister()
+
 		time.Sleep(1050 * time.Millisecond)
 
-		err = <-stream.Exit
+		err = <-exit
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldEqual, "exit status 1")
-
 	})
 
 	Convey("Given I have a client that writes a file", t, func() {
@@ -107,7 +124,11 @@ func TestStdioClient(t *testing.T) {
 		stream, err := cl.Start(ctx)
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
-		So(<-stream.Exit, ShouldBeNil)
+
+		exit, unregister := stream.Exit()
+		defer unregister()
+
+		So(<-exit, ShouldBeNil)
 
 		_, err = os.Stat("testfile")
 		So(err, ShouldBeNil)
@@ -128,7 +149,11 @@ func TestStdioClient(t *testing.T) {
 		stream, err := cl.Start(ctx)
 		So(err, ShouldBeNil)
 		So(stream, ShouldNotBeNil)
-		So(<-stream.Exit, ShouldBeNil)
+
+		exit, unregister := stream.Exit()
+		defer unregister()
+
+		So(<-exit, ShouldBeNil)
 
 		_, err = os.Stat("testfile")
 		So(err.Error(), ShouldEqual, "stat testfile: no such file or directory")
@@ -145,15 +170,16 @@ func TestStdioClient(t *testing.T) {
 		defer cancel()
 
 		stream, err := cl.Start(ctx)
+		So(err, ShouldBeNil)
+		So(stream, ShouldNotBeNil)
+
+		exit, unregister := stream.Exit()
+		defer unregister()
 
 		time.Sleep(300 * time.Millisecond)
 		cancel()
 
-		So(err, ShouldBeNil)
-		So(stream, ShouldNotBeNil)
-
-		err = <-stream.Exit
-		So(err, ShouldNotBeNil)
+		err = <-exit
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldEqual, "signal: interrupt")
 	})

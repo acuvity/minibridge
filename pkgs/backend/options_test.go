@@ -7,6 +7,7 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 	"go.acuvity.ai/bahamut"
+	"go.acuvity.ai/minibridge/pkgs/mcp"
 	"go.acuvity.ai/minibridge/pkgs/metrics"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/scan"
@@ -16,7 +17,7 @@ import (
 type fakePolicer struct {
 }
 
-func (f fakePolicer) Police(context.Context, api.Request) (*api.MCPCall, error) {
+func (f fakePolicer) Police(context.Context, api.Request) (*mcp.Message, error) {
 	return nil, nil
 }
 

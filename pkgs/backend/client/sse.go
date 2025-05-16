@@ -79,6 +79,12 @@ func (c *sseClient) Start(ctx context.Context, opts ...Option) (pipe *MCPStream,
 		req.Header.Set("Authorization", cfg.auth.Encode())
 	}
 
+	stream := NewMCPStream(ctx)
+	out, unregisterOut := stream.Stdout()
+	defer unregisterOut()
+	exit, unregisterExit := stream.Exit()
+	defer unregisterExit()
+
 	// we don't close the body here (which makes the linter all triggered)
 	// because it's a long running connection. however readResponse will
 	// do it on exit
@@ -95,14 +101,8 @@ func (c *sseClient) Start(ctx context.Context, opts ...Option) (pipe *MCPStream,
 		return nil, fmt.Errorf("invalid response from sse initialization (%s): %s", req.URL.String(), resp.Status)
 	}
 
-	errCh := make(chan []byte)
-	exitCh := make(chan error)
-
-	inCh := make(chan []byte)
-	go c.readRequest(ctx, inCh, exitCh, cfg.auth)
-
-	outCh := make(chan []byte)
-	go c.readResponse(ctx, resp.Body, outCh, exitCh)
+	go c.readRequest(ctx, stream.stdin, stream.exit, cfg.auth)
+	go c.readResponse(ctx, resp.Body, stream.stdout, stream.exit)
 
 	// Get the first response to get the endpoint
 	var data []byte
@@ -110,16 +110,16 @@ func (c *sseClient) Start(ctx context.Context, opts ...Option) (pipe *MCPStream,
 L:
 	for {
 		select {
-		case data = <-outCh:
+		case data = <-out:
 			break L
 
-		case err := <-exitCh:
+		case err := <-exit:
 			if !errors.Is(err, io.EOF) {
 				return nil, fmt.Errorf("unable to process sse message: %w", err)
 			}
 
-		case <-time.After(3 * time.Second):
-			return nil, fmt.Errorf("did not receive /message endpoint in time")
+		case <-time.After(time.Second):
+			return nil, fmt.Errorf("did not receive /message endpoint in time: timeout")
 
 		case <-ctx.Done():
 			return nil, fmt.Errorf("did not receive /message endpoint in time: %w", ctx.Err())
@@ -133,12 +133,7 @@ L:
 	)
 	slog.Debug("SSE Client: message endpoint set", "endpoint", c.messageEndpoint)
 
-	return &MCPStream{
-		Stdin:  inCh,
-		Stdout: outCh,
-		Stderr: errCh,
-		Exit:   exitCh,
-	}, nil
+	return stream, nil
 }
 
 func (c *sseClient) readRequest(ctx context.Context, ch chan []byte, exitCh chan error, auth *auth.Auth) {

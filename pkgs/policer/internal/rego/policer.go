@@ -10,6 +10,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/open-policy-agent/opa/v1/ast"
 	"github.com/open-policy-agent/opa/v1/rego"
+	"go.acuvity.ai/minibridge/pkgs/mcp"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 )
 
@@ -58,7 +59,7 @@ func New(policy string) (*Policer, error) {
 
 func (p *Policer) Type() string { return "rego" }
 
-func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, error) {
+func (p *Policer) Police(ctx context.Context, preq api.Request) (*mcp.Message, error) {
 
 	res, err := p.queryAllow.Eval(ctx, rego.EvalInput(preq), rego.EvalPrintHook(printer{}))
 	if err != nil {
@@ -100,13 +101,13 @@ func (p *Policer) Police(ctx context.Context, preq api.Request) (*api.MCPCall, e
 
 	bindings := res[0].Bindings
 
-	mcp, ok := bindings["mcp"].(map[string]any)
+	newmcp, ok := bindings["mcp"].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("invalid binding: mcp must be an map[string]any, got %T", bindings["mcp"])
 	}
 
-	mcall := &api.MCPCall{}
-	if err := mapstructure.Decode(mcp, mcall); err != nil {
+	mcall := &mcp.Message{}
+	if err := mapstructure.Decode(newmcp, mcall); err != nil {
 		return nil, fmt.Errorf("unable to decode rego mcp into valid MCP call: %w", err)
 	}
 

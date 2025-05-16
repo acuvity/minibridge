@@ -10,37 +10,34 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/mitchellh/mapstructure"
 	"go.acuvity.ai/minibridge/pkgs/backend/client"
-	"go.acuvity.ai/minibridge/pkgs/policer/api"
+	"go.acuvity.ai/minibridge/pkgs/mcp"
 )
 
 type Dump struct {
-	Tools             api.Tools             `json:"tools,omitempty"`
-	Resources         api.Resources         `json:"resources,omitempty"`
-	ResourceTemplates api.ResourceTemplates `json:"resourceTemplates,omitempty"`
-	Prompts           api.Prompts           `json:"prompts,omitempty"`
+	Tools             mcp.Tools             `json:"tools,omitempty"`
+	Resources         mcp.Resources         `json:"resources,omitempty"`
+	ResourceTemplates mcp.ResourceTemplates `json:"resourceTemplates,omitempty"`
+	Prompts           mcp.Prompts           `json:"prompts,omitempty"`
 }
 
 // DumpAll dumps all the all available tools/resource/prompts from the given client.MCPStream.
 func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusions) (Dump, error) {
 
-	if _, err := stream.Roundtrip(ctx, api.NewInitCall(api.ProtocolVersion20250326)); err != nil {
+	if _, err := stream.SendRequest(ctx, mcp.NewInitMessage(mcp.ProtocolVersion20250326)); err != nil {
 		return Dump{}, fmt.Errorf("unable to send mcp request: %w", err)
 	}
 
-	notif := api.NewMCPCall("")
-	notif.Method = "notifications/initialized"
-	if err := stream.Send(ctx, notif); err != nil {
-		return Dump{}, fmt.Errorf("unable to send mcp inititlized notif: %w", err)
+	if err := stream.SendNotification(ctx, mcp.NewNotification("notifications/initialize")); err != nil {
+		return Dump{}, fmt.Errorf("unable to send mcp initialized notif: %w", err)
 	}
 
 	dump := Dump{}
 
 	// Tools
-
 	if !exclusions.Tools {
-		toolsReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
+		toolsReq := mcp.NewMessage(uuid.Must(uuid.NewV7()).String())
 		toolsReq.Method = "tools/list"
-		resps, err := stream.PRoundtrip(ctx, toolsReq)
+		resps, err := stream.SendPaginatedRequest(ctx, toolsReq)
 		if err != nil {
 			return Dump{}, fmt.Errorf("unable to send tools/list mcp request: %w", err)
 		}
@@ -51,7 +48,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusio
 				continue
 			}
 
-			tools := api.Tools{}
+			tools := mcp.Tools{}
 			if err := mapstructure.Decode(resp.Result["tools"], &tools); err != nil {
 				return Dump{}, fmt.Errorf("unable to convert to tools: %w", err)
 			}
@@ -62,9 +59,9 @@ func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusio
 
 	// Resources
 	if !exclusions.Resources {
-		resourcesReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
+		resourcesReq := mcp.NewMessage(uuid.Must(uuid.NewV7()).String())
 		resourcesReq.Method = "resources/list"
-		resps, err := stream.PRoundtrip(ctx, resourcesReq)
+		resps, err := stream.SendPaginatedRequest(ctx, resourcesReq)
 		if err != nil {
 			return Dump{}, fmt.Errorf("unable to send resources/list mcp request: %w", err)
 		}
@@ -75,7 +72,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusio
 				continue
 			}
 
-			resources := api.Resources{}
+			resources := mcp.Resources{}
 			if err := mapstructure.Decode(resp.Result["resources"], &resources); err != nil {
 				return Dump{}, fmt.Errorf("unable to convert to resources: %w", err)
 			}
@@ -84,9 +81,9 @@ func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusio
 		}
 
 		// Resources Templates
-		resourcesTemplateReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
+		resourcesTemplateReq := mcp.NewMessage(uuid.Must(uuid.NewV7()).String())
 		resourcesTemplateReq.Method = "resources/templates/list"
-		resps, err = stream.PRoundtrip(ctx, resourcesTemplateReq)
+		resps, err = stream.SendPaginatedRequest(ctx, resourcesTemplateReq)
 		if err != nil {
 			return Dump{}, fmt.Errorf("unable to send resources/templates/list mcp request: %w", err)
 		}
@@ -97,7 +94,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusio
 				continue
 			}
 
-			resourceTemplates := api.ResourceTemplates{}
+			resourceTemplates := mcp.ResourceTemplates{}
 			if err := mapstructure.Decode(resp.Result["resourceTemplates"], &resourceTemplates); err != nil {
 				return Dump{}, fmt.Errorf("unable to convert to resources templates: %w", err)
 			}
@@ -109,9 +106,9 @@ func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusio
 
 	// Prompts
 	if !exclusions.Prompts {
-		promptsReq := api.NewMCPCall(uuid.Must(uuid.NewV7()).String())
+		promptsReq := mcp.NewMessage(uuid.Must(uuid.NewV7()).String())
 		promptsReq.Method = "prompts/list"
-		resps, err := stream.PRoundtrip(ctx, promptsReq)
+		resps, err := stream.SendPaginatedRequest(ctx, promptsReq)
 		if err != nil {
 			return Dump{}, fmt.Errorf("unable to send prompts/list mcp request: %w", err)
 		}
@@ -122,7 +119,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusio
 				continue
 			}
 
-			prompts := api.Prompts{}
+			prompts := mcp.Prompts{}
 			if err := mapstructure.Decode(resp.Result["prompts"], &prompts); err != nil {
 				return Dump{}, fmt.Errorf("unable to convert to prompts: %w", err)
 			}
@@ -134,7 +131,7 @@ func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusio
 }
 
 // HashTools will generate Hashes for the given api.Tools
-func HashTools(tools api.Tools) (Hashes, error) {
+func HashTools(tools mcp.Tools) (Hashes, error) {
 
 	hashes := []Hash{}
 	for _, tool := range tools {
@@ -182,7 +179,7 @@ func HashTools(tools api.Tools) (Hashes, error) {
 }
 
 // HashPrompt generate Hashes for the given api.Prompt
-func HashPrompts(prompts api.Prompts) (Hashes, error) {
+func HashPrompts(prompts mcp.Prompts) (Hashes, error) {
 
 	hashes := []Hash{}
 	for _, tool := range prompts {
