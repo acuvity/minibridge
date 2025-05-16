@@ -22,6 +22,7 @@ import (
 	"go.acuvity.ai/minibridge/pkgs/info"
 	"go.acuvity.ai/minibridge/pkgs/internal/cors"
 	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
+	"go.acuvity.ai/minibridge/pkgs/mcp"
 	"go.acuvity.ai/minibridge/pkgs/oauth"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/scan"
@@ -236,6 +237,16 @@ func (p *wsBackend) handleWS(w http.ResponseWriter, req *http.Request) {
 	auth, hasAuth := parseBasicAuth(req.Header.Get("Authorization"))
 
 	stream, err := p.client.Start(ctx, client.OptionAuth(auth))
+
+	stdout, unregisterOut := stream.Stdout()
+	stderr, unregisterErr := stream.Stderr()
+	exit, unregisterExit := stream.Exit()
+	defer func() {
+		unregisterOut()
+		unregisterErr()
+		unregisterExit()
+	}()
+
 	if err != nil {
 
 		if errors.Is(err, client.ErrAuthRequired) {
@@ -252,7 +263,7 @@ func (p *wsBackend) handleWS(w http.ResponseWriter, req *http.Request) {
 
 	select {
 	default:
-	case err := <-stream.Exit:
+	case err := <-exit:
 		slog.Error("MCP server has exited", err)
 		hErr(w, fmt.Sprintf("mcp server has exited: %s", err), http.StatusInternalServerError, span)
 		m(http.StatusInternalServerError)
@@ -312,9 +323,9 @@ func (p *wsBackend) handleWS(w http.ResponseWriter, req *http.Request) {
 				continue
 			}
 
-			stream.Stdin <- sanitize.Data(data)
+			stream.Stdin() <- sanitize.Data(data)
 
-		case data := <-stream.Stdout:
+		case data := <-stdout:
 
 			slog.Debug("Received data from MCP Server", "msg", string(data))
 
@@ -325,15 +336,15 @@ func (p *wsBackend) handleWS(w http.ResponseWriter, req *http.Request) {
 
 			ws.Write(sanitize.Data(data))
 
-		case data := <-stream.Stderr:
+		case data := <-stderr:
 			_, _ = rb.Write(data)
 			slog.Debug("MCP Server Log", "stderr", string(data))
 
-		case err := <-stream.Exit:
+		case err := <-exit:
 
 			select {
 			default:
-			case data := <-stream.Stderr:
+			case data := <-stderr:
 				_, _ = rb.Write(data)
 			}
 
@@ -374,18 +385,18 @@ func (p *wsBackend) handleWS(w http.ResponseWriter, req *http.Request) {
 
 func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[context.Context], session wsc.Websocket, agent api.Agent, data []byte, rtype api.CallType) (buff []byte, err error) {
 
-	call := api.NewMCPCall("")
-	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &call); err != nil {
+	msg := mcp.NewMessage("")
+	if err := elemental.Decode(elemental.EncodingTypeJSON, data, &msg); err != nil {
 		var oerr = err
-		call.Error = api.NewMCPError(err)
-		if data, err = elemental.Encode(elemental.EncodingTypeJSON, call); err != nil {
+		msg.Error = mcp.NewError(err)
+		if data, err = elemental.Encode(elemental.EncodingTypeJSON, msg); err != nil {
 			return nil, fmt.Errorf("unable to decode mcp call and to encode an error: %w (original: %w)", err, oerr)
 		}
 		return data, nil
 	}
 
 	// We check if we have the _meta params in the call and if so, we get the otel context from there.
-	mc := newMCPMetaCarrier(call)
+	mc := newMCPMetaCarrier(msg)
 	if len(mc.meta) > 0 {
 		ctx = otel.GetTextMapPropagator().Extract(ctx, mc)
 	}
@@ -395,7 +406,7 @@ func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[conte
 		kind = trace.SpanKindServer
 	}
 
-	ctx, pctx, lspan, name := spanContextFromCache(ctx, cache, p.cfg.tracer, call, kind)
+	ctx, pctx, lspan, name := spanContextFromCache(ctx, cache, p.cfg.tracer, msg, kind)
 	defer lspan.End()
 
 	var spc *api.SpanContext
@@ -411,7 +422,7 @@ func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[conte
 		}
 	}
 
-	if data, err = p.police(ctx, spc, rtype, agent, call, data); err != nil {
+	if data, err = p.police(ctx, spc, rtype, agent, msg, data); err != nil {
 
 		var oerr = err
 		if errors.Is(err, api.ErrBlocked) {
@@ -419,8 +430,8 @@ func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[conte
 			return nil, nil
 		}
 
-		call.Error = api.NewMCPError(err)
-		if data, err = elemental.Encode(elemental.EncodingTypeJSON, call); err != nil {
+		msg.Error = mcp.NewError(err)
+		if data, err = elemental.Encode(elemental.EncodingTypeJSON, msg); err != nil {
 			return nil, fmt.Errorf("unable to police mcp call: %w (original: %w)", err, oerr)
 		}
 		return data, nil
@@ -429,12 +440,12 @@ func (p *wsBackend) handleMCPCall(ctx context.Context, cache *ccache.Cache[conte
 	return data, nil
 }
 
-func (p *wsBackend) police(ctx context.Context, spc *api.SpanContext, rtype api.CallType, agent api.Agent, call api.MCPCall, rawData []byte) ([]byte, error) {
+func (p *wsBackend) police(ctx context.Context, spc *api.SpanContext, rtype api.CallType, agent api.Agent, call mcp.Message, rawData []byte) ([]byte, error) {
 
 	// This is tools/list response, if we have hashes for them, we verify their integrity.
 	if dtools, ok := call.Result["tools"]; ok && len(p.cfg.sbom.Tools) > 0 {
 
-		tools := api.Tools{}
+		tools := mcp.Tools{}
 		if err := mapstructure.Decode(dtools, &tools); err != nil {
 			return nil, fmt.Errorf("unable to decode tools result for hashing: %w", err)
 		}
@@ -452,7 +463,7 @@ func (p *wsBackend) police(ctx context.Context, spc *api.SpanContext, rtype api.
 	// This is prompts/list response, if we have hashes for them, we verify their integrity.
 	if dtools, ok := call.Result["prompts"]; ok && len(p.cfg.sbom.Prompts) > 0 {
 
-		prompts := api.Prompts{}
+		prompts := mcp.Prompts{}
 		if err := mapstructure.Decode(dtools, &prompts); err != nil {
 			return nil, fmt.Errorf("unable to decode prompts result for hashing: %w", err)
 		}
@@ -532,7 +543,7 @@ func spanContextFromCache(
 	ctx context.Context,
 	cache *ccache.Cache[context.Context],
 	tracer trace.Tracer,
-	call api.MCPCall,
+	call mcp.Message,
 	kind trace.SpanKind,
 ) (context.Context, context.Context, trace.Span, string) {
 

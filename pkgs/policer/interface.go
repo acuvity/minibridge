@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 
 	"go.acuvity.ai/minibridge/pkgs/auth"
+	"go.acuvity.ai/minibridge/pkgs/mcp"
 	"go.acuvity.ai/minibridge/pkgs/policer/api"
 	"go.acuvity.ai/minibridge/pkgs/policer/internal/http"
 	"go.acuvity.ai/minibridge/pkgs/policer/internal/rego"
@@ -12,7 +13,7 @@ import (
 
 // A Policer is the interface of objects that can police request.
 type Policer interface {
-	Police(context.Context, api.Request) (*api.MCPCall, error)
+	Police(context.Context, api.Request) (*mcp.Message, error)
 	Type() string
 }
 

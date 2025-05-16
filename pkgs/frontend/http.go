@@ -21,7 +21,7 @@ import (
 	"go.acuvity.ai/minibridge/pkgs/info"
 	"go.acuvity.ai/minibridge/pkgs/internal/cors"
 	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
-	"go.acuvity.ai/minibridge/pkgs/policer/api"
+	"go.acuvity.ai/minibridge/pkgs/mcp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -228,7 +228,7 @@ func (p *httpFrontend) handleMCP(w http.ResponseWriter, req *http.Request) {
 		defer func() { _ = req.Body.Close() }()
 	}
 
-	call := api.MCPCall{}
+	call := mcp.Message{}
 
 	// Is this the protocol? a bug in Inspector?
 	if len(data) > 0 {
@@ -317,14 +317,14 @@ func (p *httpFrontend) handleMCP(w http.ResponseWriter, req *http.Request) {
 				continue
 			}
 
-			resp := api.MCPCall{}
+			resp := mcp.Message{}
 			if err = json.Unmarshal(data, &resp); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				m(http.StatusInternalServerError)
 				return
 			}
 
-			if resp.IDString() != "" && resp.IDString() != call.IDString() {
+			if !mcp.RelatedIDs(call.ID, resp.ID) {
 				continue
 			}
 
@@ -333,9 +333,7 @@ func (p *httpFrontend) handleMCP(w http.ResponseWriter, req *http.Request) {
 				continue
 			}
 
-			if resp.IDString() != "" && resp.IDString() == call.IDString() {
-				return
-			}
+			return
 
 		case <-ctx.Done():
 			return
