@@ -155,6 +155,7 @@ func TestSSEClient(t *testing.T) {
 				mutex.Unlock()
 
 				<-req.Context().Done()
+				return
 			}
 
 			mutex.RLock()
@@ -212,6 +213,7 @@ func TestSSEClient(t *testing.T) {
 				mutex.Unlock()
 
 				<-req.Context().Done()
+				return
 			}
 
 			mutex.Lock()
@@ -255,6 +257,7 @@ func TestSSEClient(t *testing.T) {
 				rc := http.NewResponseController(w)
 				_ = rc.Flush()
 				<-req.Context().Done()
+				return
 			}
 
 			w.WriteHeader(http.StatusNotAcceptable)

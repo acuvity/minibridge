@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -77,7 +78,7 @@ func (s *MCPStream) Stdin() chan []byte {
 // when the channel is not needed anymore.
 // Failure to do so will leak go routines.
 func (s *MCPStream) Stdout() (chan []byte, func()) {
-	c := make(chan []byte, 1)
+	c := make(chan []byte, 8)
 	s.registerOut(c)
 	return c, func() { s.unregisterOut(c) }
 }
@@ -88,7 +89,7 @@ func (s *MCPStream) Stdout() (chan []byte, func()) {
 // when the channel is not needed anymore.
 // Failure to do so will leak go routines.
 func (s *MCPStream) Stderr() (chan []byte, func()) {
-	c := make(chan []byte, 1)
+	c := make(chan []byte, 8)
 	s.registerErr(c)
 	return c, func() { s.unregisterErr(c) }
 }
@@ -220,7 +221,11 @@ func (s *MCPStream) start(ctx context.Context) {
 
 				s.RLock()
 				for c := range s.outChs {
-					c <- data
+					select {
+					case c <- data:
+					default:
+						slog.Error("stdout message dropped for registered channel")
+					}
 				}
 				s.RUnlock()
 
@@ -228,7 +233,11 @@ func (s *MCPStream) start(ctx context.Context) {
 
 				s.RLock()
 				for c := range s.errChs {
-					c <- data
+					select {
+					case c <- data:
+					default:
+						slog.Error("stderr message dropped for registered channel")
+					}
 				}
 				s.RUnlock()
 
@@ -236,7 +245,11 @@ func (s *MCPStream) start(ctx context.Context) {
 
 				s.RLock()
 				for c := range s.exitChs {
-					c <- err
+					select {
+					case c <- err:
+					default:
+						slog.Error("exit message dropped for registered channel")
+					}
 				}
 				s.RUnlock()
 

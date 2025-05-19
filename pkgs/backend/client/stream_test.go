@@ -90,7 +90,7 @@ func TestMCPStream(t *testing.T) {
 		defer cancel()
 
 		done := make(chan bool, 1)
-		cstdin := make(chan []byte, 1)
+		cstdin := make(chan []byte, 2)
 		go func() {
 			cstdin <- <-stream.stdin
 			stream.stdout <- []byte(`{"id":"not-id"}`)
