@@ -367,8 +367,9 @@ func (p *wsBackend) handleWS(w http.ResponseWriter, req *http.Request) {
 
 		case err := <-ws.Done():
 			if err != nil &&
-				!strings.HasSuffix(err.Error(), "websocket: close 1001 (going away)") &&
 				!strings.HasSuffix(err.Error(), "websocket: close 1000 (normal)") &&
+				!strings.HasSuffix(err.Error(), "websocket: close 1001 (going away)") &&
+				!strings.HasSuffix(err.Error(), "websocket: close 1005 (no status)") &&
 				!strings.HasSuffix(err.Error(), "websocket: close 1006 (abnormal closure): unexpected EOF") {
 				slog.Error("Backend websocket has closed", err)
 			} else {
