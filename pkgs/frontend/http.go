@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gofrs/uuid"
 	"go.acuvity.ai/minibridge/pkgs/auth"
 	"go.acuvity.ai/minibridge/pkgs/frontend/internal/session"
 	"go.acuvity.ai/minibridge/pkgs/info"
@@ -547,7 +548,7 @@ func (p *httpFrontend) startSession(ctx context.Context, req *http.Request) (*se
 		return nil, fmt.Errorf("unable to register session backend: %w", err)
 	}
 
-	sid := fmt.Sprintf("%x", ch)
+	sid := uuid.Must(uuid.NewV7()).String()
 
 	s := session.New(ws, ch, sid)
 
