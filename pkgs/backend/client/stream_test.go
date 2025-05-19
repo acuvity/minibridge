@@ -13,7 +13,7 @@ import (
 func TestMCPStream(t *testing.T) {
 
 	Convey("I have a running stream, registrations should work", t, func() {
-		ctx, cancel := context.WithCancel(t.Context())
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 
 		stream := NewMCPStream(ctx)
@@ -210,15 +210,18 @@ func TestMCPStream(t *testing.T) {
 
 	Convey("calling SendPaginatedRequest while context cancels should work", t, func() {
 
-		stream := NewMCPStream(t.Context())
+		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+		defer cancel()
 
-		ctx, cancel := context.WithCancel(t.Context())
+		stream := NewMCPStream(ctx)
+
+		sctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		// enqueue the resp immediately
 		go func() { stream.stdout <- []byte(`{"id":46,"jsonrpc":"2.0","result":{"nextCursor":"1"}}`) }()
 
-		calls, err := stream.SendPaginatedRequest(ctx, mcp.NewMessage(44))
+		calls, err := stream.SendPaginatedRequest(sctx, mcp.NewMessage(44))
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldEqual, "unable to send paginated request: unable to send request: context canceled")
 		So(len(calls), ShouldEqual, 0)
