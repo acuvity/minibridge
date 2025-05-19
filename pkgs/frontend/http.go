@@ -406,6 +406,7 @@ func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 
 		case <-ctx.Done():
 			slog.Debug("Client is gone from stream")
+			p.smanager.Release(s.ID(), readCh)
 			return
 
 		case data := <-readCh:
