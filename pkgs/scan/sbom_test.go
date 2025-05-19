@@ -129,14 +129,8 @@ func TestSBOM_Matches(t *testing.T) {
 					},
 				}
 			},
-			true,
-			func(err error, t *testing.T) {
-				want := "'a1': invalid param: invalid len. left: 2 right: 1"
-				if err.Error() != want {
-					t.Logf("invalid err. want: %s got: %s", want, err.Error())
-					t.Fail()
-				}
-			},
+			false,
+			nil,
 		},
 		{
 			"extra param",
@@ -227,14 +221,8 @@ func TestSBOM_Matches(t *testing.T) {
 					},
 				}
 			},
-			true,
-			func(err error, t *testing.T) {
-				want := "invalid len. left: 2 right: 1"
-				if err.Error() != want {
-					t.Logf("invalid err. want: %s got: %s", want, err.Error())
-					t.Fail()
-				}
-			},
+			false,
+			nil,
 		},
 		{
 			"extra tool",
@@ -373,7 +361,7 @@ func TestSBOM_Matches(t *testing.T) {
 			},
 		},
 		{
-			"tool name missing",
+			"same len, different tool",
 			func(t *testing.T) Hashes {
 				return Hashes{
 					{
@@ -407,7 +395,7 @@ func TestSBOM_Matches(t *testing.T) {
 			},
 			true,
 			func(err error, t *testing.T) {
-				want := "'a1': missing"
+				want := "'b1': missing"
 				if err.Error() != want {
 					t.Logf("invalid err. want: %s got: %s", want, err.Error())
 					t.Fail()
@@ -415,7 +403,7 @@ func TestSBOM_Matches(t *testing.T) {
 			},
 		},
 		{
-			"param name missing left",
+			"param name missing",
 			func(t *testing.T) Hashes {
 				return Hashes{
 					{
@@ -449,7 +437,7 @@ func TestSBOM_Matches(t *testing.T) {
 			},
 			true,
 			func(err error, t *testing.T) {
-				want := "'a1': invalid param: 'p1': missing"
+				want := "'a1': invalid param: 'q1': missing"
 				if err.Error() != want {
 					t.Logf("invalid err. want: %s got: %s", want, err.Error())
 					t.Fail()

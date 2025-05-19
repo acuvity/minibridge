@@ -68,16 +68,16 @@ type Hash struct {
 
 func cmpH(a Hashes, b Hashes) error {
 
-	if len(a) != len(b) {
+	if len(b) > len(a) {
 		return fmt.Errorf("invalid len. left: %d right: %d", len(a), len(b))
 	}
 
 	am := a.Map()
 	bm := b.Map()
 
-	for name, h := range am {
+	for name, h := range bm {
 
-		o, ok := bm[name]
+		o, ok := am[name]
 		if !ok {
 			return fmt.Errorf("'%s': missing", name)
 		}
@@ -86,9 +86,9 @@ func cmpH(a Hashes, b Hashes) error {
 			return fmt.Errorf("'%s': hash mismatch", name)
 		}
 
-		if len(h.Params) > 0 {
+		if len(o.Params) > 0 {
 
-			if err := cmpH(h.Params, o.Params); err != nil {
+			if err := cmpH(o.Params, h.Params); err != nil {
 				return fmt.Errorf("'%s': invalid param: %w", name, err)
 			}
 		}
