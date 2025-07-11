@@ -501,6 +501,7 @@ func (p *httpFrontend) handleOAuth2(w http.ResponseWriter, req *http.Request) {
 	uu, err := url.Parse(u)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("unable to parse oauth2 url: %s", err), http.StatusBadRequest)
+		return
 	}
 
 	uu.Scheme = "http"
