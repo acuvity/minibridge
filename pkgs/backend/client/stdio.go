@@ -3,12 +3,15 @@ package client
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	"go.acuvity.ai/minibridge/pkgs/internal/sanitize"
 )
@@ -62,7 +65,7 @@ func (c *stdioClient) Start(ctx context.Context, _ ...Option) (pipe *MCPStream, 
 
 	cmd.Dir = dir
 	cmd.Cancel = func() error {
-		if err := cmd.Process.Signal(os.Interrupt); err != nil {
+		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
 			return err
 		}
 
@@ -132,7 +135,8 @@ func (c *stdioClient) readResponses(ctx context.Context, stdout io.ReadCloser, c
 	for {
 		data, err := bstdout.ReadBytes('\n')
 		if err != nil {
-			if err != io.EOF {
+			perr := &fs.PathError{}
+			if err != io.EOF && !errors.As(err, &perr) {
 				slog.Error("Unable to read response from stdout", "err", err)
 			}
 			return
@@ -151,7 +155,8 @@ func (c *stdioClient) readErrors(ctx context.Context, stderr io.ReadCloser, ch c
 	for {
 		data, err := bstderr.ReadBytes('\n')
 		if err != nil {
-			if err != io.EOF {
+			perr := &fs.PathError{}
+			if err != io.EOF && !errors.As(err, &perr) {
 				slog.Error("Unable to read error response from stderr", "err", err)
 			}
 			return

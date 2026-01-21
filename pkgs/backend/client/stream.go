@@ -274,6 +274,8 @@ func (s *MCPStream) start(ctx context.Context) {
 					}
 				}
 				s.RUnlock()
+
+				return
 			}
 		}
 	}()
