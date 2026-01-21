@@ -26,7 +26,7 @@ builds:
 archives:
   - id: minibridge
     formats: ["zip"]
-    builds:
+    ids:
       - minibridge
 
 signs:
