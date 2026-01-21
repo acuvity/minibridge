@@ -35,8 +35,8 @@ type RegistrationResponse struct {
 
 type Credentials struct {
 	ClientID     string `json:"client_id"`
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken  string `json:"access_token"`  // #nosec G117
+	RefreshToken string `json:"refresh_token"` // #nosec G117
 }
 
 // Refresh performs a refresh of the access token using the RefreshToken in the gviven Creds

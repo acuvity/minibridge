@@ -58,7 +58,7 @@ type Agent struct {
 	User string `json:"user"`
 
 	// Password contains the password from the Auth header.
-	Password string `json:"password"`
+	Password string `json:"password"` // #nosec G117
 
 	// RemoteAddr contains the agent's RemoteAddr, as seen by minibridge.
 	RemoteAddr string `json:"remoteAddr"`
