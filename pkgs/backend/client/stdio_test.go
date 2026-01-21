@@ -181,6 +181,6 @@ func TestStdioClient(t *testing.T) {
 
 		err = <-exit
 		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldEqual, "signal: interrupt")
+		So(err.Error(), ShouldEqual, "signal: terminated")
 	})
 }
