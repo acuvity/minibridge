@@ -1,14 +1,14 @@
 module go.acuvity.ai/minibridge
 
-go 1.24.2
+go 1.24.6
 
 require (
-	go.acuvity.ai/a3s v0.0.0-20250513140342-5386bdb1c75f
-	go.acuvity.ai/bahamut v0.0.0-20250416135203-fa73110b2604
-	go.acuvity.ai/elemental v0.0.0-20250430230636-ac931152934a
-	go.acuvity.ai/manipulate v0.0.0-20250416135246-f7d22e975de4 // indirect
-	go.acuvity.ai/regolithe v0.0.0-20250321141528-1fe83b60f317 // indirect
-	go.acuvity.ai/tg v0.0.0-20250220234315-d9494083aa3a
+	go.acuvity.ai/a3s v0.0.0-20260227164805-e02155bae801
+	go.acuvity.ai/bahamut v0.0.0-20260227164547-cf0938170648
+	go.acuvity.ai/elemental v0.0.0-20260227164056-44f2e3fd9f3b
+	go.acuvity.ai/manipulate v0.0.0-20260227164211-f481c4aa1754 // indirect
+	go.acuvity.ai/regolithe v0.0.0-20260108214434-eb28e7a6e391 // indirect
+	go.acuvity.ai/tg v1.0.1-0.20260227164009-15f51a26c9e0
 	go.acuvity.ai/wsc v0.0.0-20250506232542-8de7ff436ec0
 )
 
@@ -54,11 +54,11 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudflare/circl v1.6.1 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
@@ -110,12 +110,12 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20200313005456-10cdbea86bc0 // indirect
+	github.com/redis/go-redis/v9 v9.14.0 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
