@@ -133,7 +133,8 @@ func DumpAll(ctx context.Context, stream *client.MCPStream, exclusions *Exclusio
 // HashTools will generate Hashes for the given api.Tools
 func HashTools(tools mcp.Tools) (Hashes, error) {
 
-	hashes := []Hash{}
+	hashes := make([]Hash, 0, len(tools))
+
 	for _, tool := range tools {
 
 		h := Hash{
@@ -181,7 +182,8 @@ func HashTools(tools mcp.Tools) (Hashes, error) {
 // HashPrompt generate Hashes for the given api.Prompt
 func HashPrompts(prompts mcp.Prompts) (Hashes, error) {
 
-	hashes := []Hash{}
+	hashes := make([]Hash, 0, len(prompts))
+
 	for _, tool := range prompts {
 
 		h := Hash{
