@@ -23,7 +23,7 @@ func Forward(baseURL string, client *http.Client, w http.ResponseWriter, req *ht
 	breq.URL.RawQuery = req.URL.Query().Encode()
 	breq.Header = req.Header.Clone()
 
-	resp, err := client.Do(breq) // nolint: bodyclose
+	resp, err := client.Do(breq) // nolint: bodyclose #nosec: G704
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return func() {}

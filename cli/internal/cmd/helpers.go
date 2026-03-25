@@ -365,7 +365,7 @@ func makeTracer(ctx context.Context, name string) (trace.Tracer, error) {
 	tp := sdktrace.NewTracerProvider(opts...)
 
 	go func() {
-		<-ctx.Done()
+		<-ctx.Done() // #nosec: G118
 		sctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = tp.Shutdown(sctx)

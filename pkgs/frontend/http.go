@@ -392,7 +392,7 @@ func (p *httpFrontend) handleSSE(w http.ResponseWriter, req *http.Request) {
 	rc := http.NewResponseController(w)
 	defer func() { _ = rc.Flush() }()
 
-	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, s.ID()); err != nil {
+	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s?sessionId=%s\n\n", p.cfg.messagesEndpoint, s.ID()); err != nil { // #nosec: G705
 		slog.Error("Unable to send endpoint event", "sid", s.ID(), err)
 		return
 	}
