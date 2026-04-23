@@ -3,12 +3,12 @@ module go.acuvity.ai/minibridge
 go 1.26.1
 
 require (
-	go.acuvity.ai/a3s v0.0.0-20260421170556-561365b070b3
-	go.acuvity.ai/bahamut v0.0.0-20260421165250-524ad3282cca
-	go.acuvity.ai/elemental v0.0.0-20260403154455-893c40b4b95b
-	go.acuvity.ai/manipulate v0.0.0-20260406171314-7ceeb37890f6 // indirect
-	go.acuvity.ai/regolithe v0.0.0-20260108214434-eb28e7a6e391 // indirect
-	go.acuvity.ai/tg v1.0.1-0.20260403154206-79026a87f448
+	go.acuvity.ai/a3s v0.0.0-20260423214345-9c5116a7f0cd
+	go.acuvity.ai/bahamut v0.0.0-20260423213417-4e98048de25c
+	go.acuvity.ai/elemental v0.0.0-20260423213045-b41d7aac5a19
+	go.acuvity.ai/manipulate v0.0.0-20260423213734-3c32dc2b0037 // indirect
+	go.acuvity.ai/regolithe v0.0.0-20260423212828-c6b9b4d7394e // indirect
+	go.acuvity.ai/tg v1.0.1-0.20260423213220-f6124d6982b8
 	go.acuvity.ai/wsc v0.0.0-20250506232542-8de7ff436ec0
 )
 
@@ -30,11 +30,11 @@ require (
 	github.com/spf13/viper v1.20.1
 	github.com/zalando/go-keyring v0.2.6
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0
-	go.opentelemetry.io/otel v1.40.0
+	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.35.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.35.0
-	go.opentelemetry.io/otel/sdk v1.40.0
-	go.opentelemetry.io/otel/trace v1.40.0
+	go.opentelemetry.io/otel/sdk v1.43.0
+	go.opentelemetry.io/otel/trace v1.43.0
 	golang.org/x/sync v0.20.0
 )
 
@@ -67,7 +67,7 @@ require (
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.8.0 // indirect
-	github.com/go-git/go-git/v5 v5.17.1 // indirect
+	github.com/go-git/go-git/v5 v5.18.0 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -144,7 +144,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.35.0 // indirect
-	go.opentelemetry.io/otel/metric v1.40.0 // indirect
+	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
